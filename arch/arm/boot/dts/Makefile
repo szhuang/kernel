@@ -541,6 +541,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
 	rk3288-evb-android-rk818-lvds.dtb \
 	rk3288-evb-android-rk818-mipi.dtb \
 	rk3288-evb-android-rk818-mipi-edp.dtb \
+	EM3288_870A_5648.dtb \
 	rk3288-evb-rk1608.dtb \
 	rk3288-evb-rk808.dtb \
 	rk3288-evb-rk808-linux.dtb \
