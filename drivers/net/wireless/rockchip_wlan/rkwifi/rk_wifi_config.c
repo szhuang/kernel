@@ -18,7 +18,7 @@
  */
  
 #define VENDOR_ETC_FIRMWARE "/vendor/etc/firmware/"
-#define SYSTEM_ETC_FIRMWARE "/system/etc/firmware/"
+#define SYSTEM_ETC_FIRMWARE "/lib/firmware/rkwifi/"
 char ANDROID_FW_PATH[64] = {0};
 
 extern int get_wifi_chip_type(void);
