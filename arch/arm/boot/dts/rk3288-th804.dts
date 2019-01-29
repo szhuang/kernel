@@ -5,12 +5,12 @@
  */
 
 /dts-v1/;
-#include "rk3288.dtsi"
-#include "rk3288-android.dtsi"
+#include "rk3288-th804.dtsi"
 
 / {
 	model = "Rockchip RK3288 TH804";
 	compatible = "rockchip,rk3288-th804", "rockchip,rk3288";
+<<<<<<< HEAD
 
 	vcc_sys: vsys-regulator {
 		compatible = "regulator-fixed";
@@ -794,6 +794,27 @@
 	wireless-bluetooth {
 		uart0_gpios: uart0-gpios {
 			rockchip,pins = <4 19 RK_FUNC_GPIO &pcfg_pull_none>;
+=======
+};
+
+&firmware_android {
+	compatible = "android,firmware";
+	fstab {
+		compatible = "android,fstab";
+		system {
+			compatible = "android,system";
+			dev = "/dev/block/by-name/system";
+			type = "ext4";
+			mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
+			fsmgr_flags = "wait";
+		};
+		vendor {
+			compatible = "android,vendor";
+			dev = "/dev/block/by-name/vendor";
+			type = "ext4";
+			mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
+			fsmgr_flags = "wait";
+>>>>>>> rk_origin/release-4.4
 		};
 	};
 };

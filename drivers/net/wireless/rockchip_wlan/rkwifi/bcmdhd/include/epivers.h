@@ -46,6 +46,10 @@
 #define EPI_VERSION_DEV		1.579.77.41
 
 /* Driver Version String, ASCII, 32 chars max */
+<<<<<<< HEAD
 #define	EPI_VERSION_STR		"1.579.77.41.9 (r)"
+=======
+#define	EPI_VERSION_STR		"1.579.77.41.10 (r)"
+>>>>>>> rk_origin/release-4.4
 
 #endif /* _epivers_h_ */

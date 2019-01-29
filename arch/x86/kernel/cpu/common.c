@@ -769,11 +769,19 @@ void get_cpu_cap(struct cpuinfo_x86 *c)
 	/* AMD-defined flags: level 0x80000001 */
 	eax = cpuid_eax(0x80000000);
 	c->extended_cpuid_level = eax;
+<<<<<<< HEAD
 
 	if ((eax & 0xffff0000) == 0x80000000) {
 		if (eax >= 0x80000001) {
 			cpuid(0x80000001, &eax, &ebx, &ecx, &edx);
 
+=======
+
+	if ((eax & 0xffff0000) == 0x80000000) {
+		if (eax >= 0x80000001) {
+			cpuid(0x80000001, &eax, &ebx, &ecx, &edx);
+
+>>>>>>> rk_origin/release-4.4
 			c->x86_capability[CPUID_8000_0001_ECX] = ecx;
 			c->x86_capability[CPUID_8000_0001_EDX] = edx;
 		}
@@ -798,6 +806,11 @@ void get_cpu_cap(struct cpuinfo_x86 *c)
 		c->x86_phys_bits = 36;
 #endif
 
+<<<<<<< HEAD
+=======
+	c->x86_cache_bits = c->x86_phys_bits;
+
+>>>>>>> rk_origin/release-4.4
 	if (c->extended_cpuid_level >= 0x8000000a)
 		c->x86_capability[CPUID_8000_000A_EDX] = cpuid_edx(0x8000000a);
 

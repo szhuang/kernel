@@ -95,6 +95,7 @@
 		default-brightness-level = <200>;
 	};
 
+<<<<<<< HEAD
 	panel {
 		compatible = "samsung,lsl070nl01", "simple-panel";
 		backlight = <&backlight>;
@@ -137,6 +138,8 @@
 		};
 	};
 
+=======
+>>>>>>> rk_origin/release-4.4
 	multi_dais: multi-dais {
 			status = "okay";
 			compatible = "rockchip,multi-dais";
@@ -348,9 +351,15 @@
 		];
 
 		display-timings {
+<<<<<<< HEAD
 			native-mode = <&st7703_timing>;
 
 			st7703_timing: timing0 {
+=======
+			native-mode = <&timing0>;
+
+			timing0: timing0 {
+>>>>>>> rk_origin/release-4.4
 				clock-frequency = <66000000>;
 				hactive = <720>;
 				vactive = <1280>;
@@ -369,10 +378,25 @@
 	};
 };
 
+<<<<<<< HEAD
+=======
+&dsi_in_vopb {
+	status = "okay";
+};
+
+>>>>>>> rk_origin/release-4.4
 &dsi_in_vopl {
 	status = "disabled";
 };
 
+<<<<<<< HEAD
+=======
+&route_dsi {
+	connect = <&vopb_out_dsi>;
+	status = "okay";
+};
+
+>>>>>>> rk_origin/release-4.4
 &emmc {
 	bus-width = <8>;
 	cap-mmc-highspeed;
@@ -1075,6 +1099,7 @@
 	status = "okay";
 };
 
+<<<<<<< HEAD
 &lvds {
 	status = "disabled";
 
@@ -1097,6 +1122,8 @@
 	status = "okay";
 };
 
+=======
+>>>>>>> rk_origin/release-4.4
 &nandc0 {
 	status = "okay";
 };
@@ -1179,6 +1206,7 @@
 	rockchip,sleep-debug-en = <1>;
 };
 
+<<<<<<< HEAD
 &route_dsi {
 	status = "okay";
 };
@@ -1187,6 +1215,8 @@
 	status = "disabled";
 };
 
+=======
+>>>>>>> rk_origin/release-4.4
 &saradc {
 	status = "okay";
 	vref-supply = <&vcc1v8_soc>;
@@ -1222,7 +1252,11 @@
 };
 
 &tsadc {
+<<<<<<< HEAD
 	pinctrl-names = "init", "default";
+=======
+	pinctrl-names = "gpio", "otpout";
+>>>>>>> rk_origin/release-4.4
 	pinctrl-0 = <&tsadc_otp_gpio>;
 	pinctrl-1 = <&tsadc_otp_out>;
 	status = "okay";

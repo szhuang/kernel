@@ -1443,7 +1443,11 @@ dbus_attach(osl_t *osh, int rxsize, int nrxq, int ntxq, dhd_pub_t *pub,
 
 	dhd_bus = MALLOC(osh, sizeof(dhd_bus_t));
 	if (dhd_bus == NULL) {
+<<<<<<< HEAD
 		DBUSERR(("%s: malloc failed %d\n", __FUNCTION__, sizeof(dhd_bus_t)));
+=======
+		DBUSERR(("%s: malloc failed %zu\n", __FUNCTION__, sizeof(dhd_bus_t)));
+>>>>>>> rk_origin/release-4.4
 		return NULL;
 	}
 
@@ -2767,6 +2771,10 @@ dhd_dbus_probe_cb(void *arg, const char *desc, uint32 bustype,
 		}
 	} else {
 		pub = g_pub;
+<<<<<<< HEAD
+=======
+		osh = pub->osh;
+>>>>>>> rk_origin/release-4.4
 	}
 
 	if (pub->bus) {

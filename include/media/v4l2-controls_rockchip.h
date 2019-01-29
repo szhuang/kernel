@@ -34,4 +34,9 @@
 #define RK_V4L2_CID_GAIN_PERCENT (V4L2_CID_USER_RK_BASE + 2)
 #define RK_V4L2_CID_AUTO_FPS (V4L2_CID_USER_RK_BASE + 3)
 #define RK_V4L2_CID_VTS (V4L2_CID_USER_RK_BASE + 4)
+<<<<<<< HEAD
+=======
+#define RK_V4L2_CID_CLS_EXP (V4L2_CID_USER_RK_BASE + 5)
+
+>>>>>>> rk_origin/release-4.4
 #endif

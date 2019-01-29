@@ -11,6 +11,15 @@ KERNELRELEASE=$2
 SYMBOL_PREFIX=$3
 
 if ! test -r System.map ; then
+<<<<<<< HEAD
+=======
+	exit 0
+fi
+
+if [ -z $(command -v $DEPMOD) ]; then
+	echo "Warning: 'make modules_install' requires $DEPMOD. Please install it." >&2
+	echo "This is probably in the kmod package." >&2
+>>>>>>> rk_origin/release-4.4
 	exit 0
 fi
 

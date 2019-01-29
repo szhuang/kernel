@@ -33,6 +33,10 @@ DHDOFILES = aiutils.o siutils.o sbutils.o bcmutils.o bcmwifi_channels.o   \
 	dhd_linux.o dhd_linux_platdev.o dhd_linux_sched.o dhd_pno.o           \
 	dhd_common.o dhd_ip.o dhd_linux_wq.o dhd_custom_gpio.o                \
 	bcmevent.o hndpmu.o linux_osl.o wldev_common.o wl_android.o           \
+<<<<<<< HEAD
+=======
+	dhd_debug_linux.o dhd_debug.o dhd_mschdbg.o                           \
+>>>>>>> rk_origin/release-4.4
 	hnd_pktq.o hnd_pktpool.o dhd_config.o wl_android_ext.o
 
 #BCMDHD_SDIO
@@ -47,6 +51,7 @@ ifeq ($(CONFIG_BCMDHD_DISABLE_WOWLAN),y)
 endif
 else
 	DHDCFLAGS += -DSDIO_ISR_THREAD
+<<<<<<< HEAD
 endif
 
 DHDOFILES += bcmsdh.o bcmsdh_linux.o bcmsdh_sdmmc.o bcmsdh_sdmmc_linux.o  \
@@ -90,6 +95,53 @@ ifneq ($(CONFIG_CFG80211),)
 endif
 endif
 
+=======
+endif
+
+DHDOFILES += bcmsdh.o bcmsdh_linux.o bcmsdh_sdmmc.o bcmsdh_sdmmc_linux.o  \
+	dhd_sdio.o dhd_cdc.o dhd_wlfc.o
+endif
+
+#BCMDHD_PCIE
+ifneq ($(CONFIG_BCMDHD_PCIE),)
+DHDCFLAGS += -DPCIE_FULL_DONGLE -DBCMPCIE -DCUSTOM_DPC_PRIO_SETTING=-1    \
+	-DDONGLE_ENABLE_ISOLATION
+ifneq ($(CONFIG_PCI_MSI),)
+	DHDCFLAGS += -DDHD_USE_MSI
+endif
+
+DHDOFILES += dhd_pcie.o dhd_pcie_linux.o pcie_core.o dhd_flowring.o       \
+	dhd_msgbuf.o
+endif
+
+#BCMDHD_USB
+ifneq ($(CONFIG_BCMDHD_USB),)
+DHDCFLAGS += -DUSBOS_TX_THREAD -DBCMDBUS -DBCMTRXV2 -DDBUS_USB_LOOPBACK   \
+	-DBDC
+DHDCFLAGS += -DBCM_REQUEST_FW -DEXTERNAL_FW_PATH
+#DHDCFLAGS :=$(filter-out -DENABLE_INSMOD_NO_FW_LOAD,$(DHDCFLAGS))
+ifneq ($(CONFIG_BCMDHD_CUSB),)
+	DHDCFLAGS += -DBCMUSBDEV_COMPOSITE
+	DHDCFLAGS :=$(filter-out -DENABLE_INSMOD_NO_FW_LOAD,$(DHDCFLAGS))
+endif
+
+DHDOFILES += dbus.o dbus_usb.o dbus_usb_linux.o dhd_cdc.o dhd_wlfc.o
+endif
+
+#PROPTXSTATUS
+ifeq ($(CONFIG_BCMDHD_PROPTXSTATUS),y)
+ifneq ($(CONFIG_BCMDHD_USB),)
+	DHDCFLAGS += -DPROP_TXSTATUS
+endif
+ifneq ($(CONFIG_BCMDHD_SDIO),)
+	DHDCFLAGS += -DPROP_TXSTATUS
+endif
+ifneq ($(CONFIG_CFG80211),)
+	DHDCFLAGS += -DPROP_TXSTATUS_VSDB
+endif
+endif
+
+>>>>>>> rk_origin/release-4.4
 #VTS_SUPPORT
 ifeq ($(CONFIG_VTS_SUPPORT),y)
 ifneq ($(CONFIG_CFG80211),)
@@ -99,6 +151,7 @@ DHDCFLAGS += -DGSCAN_SUPPORT -DRTT_SUPPORT -DCUSTOM_FORCE_NODFS_FLAG      \
 	-DCUSTOM_COUNTRY_CODE -DDHD_FW_COREDUMP -DEXPLICIT_DISCIF_CLEANUP
 
 DHDOFILES += bcmxtlv.o dhd_rtt.o bcm_app_utils.o
+<<<<<<< HEAD
 CONFIG_LOGTRACE := y
 endif
 endif
@@ -120,6 +173,22 @@ endif
 	DHDCFLAGS :=$(filter-out -DSET_RANDOM_MAC_SOFTAP,$(DHDCFLAGS))
 endif
 
+=======
+endif
+endif
+
+# MESH support for kernel 3.10 later
+ifeq ($(CONFIG_WL_MESH),y)
+	DHDCFLAGS += -DWLMESH
+ifneq ($(CONFIG_BCMDHD_PCIE),)
+	DHDCFLAGS += -DBCM_HOST_BUF -DDMA_HOST_BUFFER_LEN=0x80000
+endif
+	DHDCFLAGS += -DDHD_UPDATE_INTF_MAC
+	DHDCFLAGS :=$(filter-out -DDHD_FW_COREDUMP,$(DHDCFLAGS))
+	DHDCFLAGS :=$(filter-out -DSET_RANDOM_MAC_SOFTAP,$(DHDCFLAGS))
+endif
+
+>>>>>>> rk_origin/release-4.4
 #obj-$(CONFIG_RKWIFI) += bcmdhd.o
 obj-$(CONFIG_AP6XXX) += bcmdhd.o
 bcmdhd-objs += $(DHDOFILES)

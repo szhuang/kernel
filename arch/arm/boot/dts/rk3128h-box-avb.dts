@@ -19,23 +19,36 @@
 	opp-330000000 {
 		status = "disabled";
 	};
+<<<<<<< HEAD
 	opp-588000000 {
 		opp-hz = /bits/ 64 <588000000>;
 		opp-microvolt = <1100000>;
 		opp-microvolt-L0 = <1100000>;
 		opp-microvolt-L1 = <1050000>;
+=======
+	opp-666000000 {
+		status = "okay";
+>>>>>>> rk_origin/release-4.4
 	};
 };
 
 &dmc {
 	system-status-freq = <
 		/*system status freq(KHz)*/
+<<<<<<< HEAD
 		SYS_STATUS_NORMAL	588000
+=======
+		SYS_STATUS_NORMAL	666000
+>>>>>>> rk_origin/release-4.4
 	>;
 };
 
 &firmware_android {
 	compatible = "android,firmware";
+<<<<<<< HEAD
+=======
+	boot_devices = "30020000.dwmmc,30030000.nandc";
+>>>>>>> rk_origin/release-4.4
 	vbmeta {
 		compatible = "android,vbmeta";
 		parts = "vbmeta,boot,system,vendor,dtbo";
@@ -44,7 +57,11 @@
 		compatible = "android,fstab";
 		vendor {
 			compatible = "android,vendor";
+<<<<<<< HEAD
 			dev = "/dev/block/platform/30020000.dwmmc/by-name/vendor";
+=======
+			dev = "/dev/block/by-name/vendor";
+>>>>>>> rk_origin/release-4.4
 			type = "ext4";
 			mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
 			fsmgr_flags = "wait,avb";

@@ -621,6 +621,23 @@ static int ov4689_enable_test_pattern(struct ov4689 *ov4689, u32 pattern)
 				OV4689_REG_VALUE_08BIT, val);
 }
 
+<<<<<<< HEAD
+=======
+static int ov4689_g_frame_interval(struct v4l2_subdev *sd,
+				   struct v4l2_subdev_frame_interval *fi)
+{
+	struct ov4689 *ov4689 = to_ov4689(sd);
+	const struct ov4689_mode *mode = ov4689->cur_mode;
+
+	mutex_lock(&ov4689->mutex);
+	fi->interval.numerator = 10000;
+	fi->interval.denominator = mode->max_fps * 10000;
+	mutex_unlock(&ov4689->mutex);
+
+	return 0;
+}
+
+>>>>>>> rk_origin/release-4.4
 static int __ov4689_start_stream(struct ov4689 *ov4689)
 {
 	int ret;
@@ -814,6 +831,10 @@ static const struct v4l2_subdev_internal_ops ov4689_internal_ops = {
 
 static const struct v4l2_subdev_video_ops ov4689_video_ops = {
 	.s_stream = ov4689_s_stream,
+<<<<<<< HEAD
+=======
+	.g_frame_interval = ov4689_g_frame_interval,
+>>>>>>> rk_origin/release-4.4
 };
 
 static const struct v4l2_subdev_pad_ops ov4689_pad_ops = {

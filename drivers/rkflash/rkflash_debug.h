@@ -74,7 +74,11 @@ extern unsigned int rkflash_debug;
 #endif
 
 #if (PRINT_SWI_NANDC_E)
+<<<<<<< HEAD
 #define PRINT_NANDC_E(...) {if (rkflash_debug & PRINT_BIT_NANDC_I)\
+=======
+#define PRINT_NANDC_E(...) {if (rkflash_debug & PRINT_BIT_NANDC_E)\
+>>>>>>> rk_origin/release-4.4
 				pr_info(__VA_ARGS__); }
 #else
 #define PRINT_NANDC_E(...)

@@ -6,6 +6,10 @@ config VIDEO_ROCKCHIP_CIF
 	depends on MEDIA_CAMERA_SUPPORT
 	select VIDEOBUF2_DMA_CONTIG
 	select V4L2_FWNODE
+<<<<<<< HEAD
+=======
+	select PHY_ROCKCHIP_MIPI_RX
+>>>>>>> rk_origin/release-4.4
 	default n
 	help
 	  Support for CIF on the rockchip SoCs like rk312x, rk3288.

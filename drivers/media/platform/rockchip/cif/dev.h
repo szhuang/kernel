@@ -16,10 +16,19 @@
 #include <media/videobuf2-v4l2.h>
 
 #define CIF_DRIVER_NAME		"rkcif"
+<<<<<<< HEAD
 
 #define RKCIF_MAX_BUS_CLK	8
 #define RKCIF_MAX_SENSOR	2
 #define RKCIF_MAX_RESET	3
+=======
+#define CIF_VIDEODEVICE_NAME	"stream_cif"
+
+#define RKCIF_MAX_BUS_CLK	8
+#define RKCIF_MAX_SENSOR	2
+#define RKCIF_MAX_RESET		5
+#define RKCIF_MAX_CSI_CHANNEL	4
+>>>>>>> rk_origin/release-4.4
 
 #define RKCIF_DEFAULT_WIDTH	640
 #define RKCIF_DEFAULT_HEIGHT	480
@@ -27,12 +36,33 @@
 #define write_cif_reg(base, addr, val)  writel(val, (addr) + (base))
 #define read_cif_reg(base, addr) readl((addr) + (base))
 
+<<<<<<< HEAD
+=======
+#define write_csihost_reg(base, addr, val)  writel(val, (addr) + (base))
+#define read_csihost_reg(base, addr) readl((addr) + (base))
+
+>>>>>>> rk_origin/release-4.4
 enum rkcif_state {
 	RKCIF_STATE_DISABLED,
 	RKCIF_STATE_READY,
 	RKCIF_STATE_STREAMING
 };
 
+<<<<<<< HEAD
+=======
+enum rkcif_chip_id {
+	CHIP_PX30_CIF,
+	CHIP_RK1808_CIF,
+	CHIP_RK3128_CIF,
+	CHIP_RK3288_CIF
+};
+
+enum host_type_t {
+	RK_CSI_RXHOST,
+	RK_DSI_RXHOST
+};
+
+>>>>>>> rk_origin/release-4.4
 struct rkcif_buffer {
 	struct vb2_v4l2_buffer vb;
 	struct list_head queue;
@@ -62,6 +92,10 @@ static inline struct rkcif_buffer *to_rkcif_buffer(struct vb2_v4l2_buffer *vb)
 struct rkcif_sensor_info {
 	struct v4l2_subdev *sd;
 	struct v4l2_mbus_config mbus;
+<<<<<<< HEAD
+=======
+	int lanes;
+>>>>>>> rk_origin/release-4.4
 };
 
 /*
@@ -90,11 +124,34 @@ enum cif_fmt_type {
  *
  * @mbus_code: mbus format
  * @fmt_val: the fmt val corresponding to CIF_FOR register
+<<<<<<< HEAD
+=======
+ * @field: the field type of the input from sensor
+>>>>>>> rk_origin/release-4.4
  */
 struct cif_input_fmt {
 	u32 mbus_code;
 	u32 fmt_val;
 	enum cif_fmt_type fmt_type;
+<<<<<<< HEAD
+=======
+	enum v4l2_field field;
+};
+
+struct csi_channel_info {
+	unsigned char id;
+	unsigned char enable;	/* capture enable */
+	unsigned char vc;
+	unsigned char data_type;
+	unsigned char crop_en;
+	unsigned char cmd_mode_en;
+	unsigned char fmt_val;
+	unsigned int width;
+	unsigned int height;
+	unsigned int virtual_width;
+	unsigned int crop_st_x;
+	unsigned int crop_st_y;
+>>>>>>> rk_origin/release-4.4
 };
 
 /*
@@ -106,6 +163,10 @@ struct cif_input_fmt {
  *
  * rkcif use shadowsock registers, so it need two buffer at a time
  * @curr_buf: the buffer used for current frame
+<<<<<<< HEAD
+=======
+ * @next_buf: the buffer used for next frame
+>>>>>>> rk_origin/release-4.4
  */
 struct rkcif_stream {
 	struct rkcif_device		*cifdev;
@@ -113,6 +174,10 @@ struct rkcif_stream {
 	bool				stopping;
 	wait_queue_head_t		wq_stopped;
 	int				frame_idx;
+<<<<<<< HEAD
+=======
+	int				frame_phase;
+>>>>>>> rk_origin/release-4.4
 
 	/* lock between irq and buf_queue */
 	spinlock_t			vbq_lock;
@@ -120,6 +185,10 @@ struct rkcif_stream {
 	struct list_head		buf_head;
 	struct rkcif_dummy_buffer	dummy_buf;
 	struct rkcif_buffer		*curr_buf;
+<<<<<<< HEAD
+=======
+	struct rkcif_buffer		*next_buf;
+>>>>>>> rk_origin/release-4.4
 
 	/* vfd lock */
 	struct mutex			vlock;
@@ -131,6 +200,10 @@ struct rkcif_stream {
 	const struct cif_input_fmt	*cif_fmt_in;
 	struct v4l2_pix_format_mplane	pixm;
 	struct v4l2_rect		crop;
+<<<<<<< HEAD
+=======
+	int				crop_enable;
+>>>>>>> rk_origin/release-4.4
 };
 
 static inline struct rkcif_stream *to_rkcif_stream(struct video_device *vdev)
@@ -148,6 +221,10 @@ struct rkcif_device {
 	struct device			*dev;
 	int				irq;
 	void __iomem			*base_addr;
+<<<<<<< HEAD
+=======
+	void __iomem			*csi_base;
+>>>>>>> rk_origin/release-4.4
 	struct clk			*clks[RKCIF_MAX_BUS_CLK];
 	int				clk_size;
 	struct vb2_alloc_ctx		*alloc_ctx;
@@ -165,6 +242,13 @@ struct rkcif_device {
 	struct rkcif_sensor_info	*active_sensor;
 
 	struct rkcif_stream		stream;
+<<<<<<< HEAD
+=======
+
+	struct csi_channel_info		channels[RKCIF_MAX_CSI_CHANNEL];
+	int				num_channels;
+	int				chip_id;
+>>>>>>> rk_origin/release-4.4
 };
 
 void rkcif_unregister_stream_vdev(struct rkcif_device *dev);

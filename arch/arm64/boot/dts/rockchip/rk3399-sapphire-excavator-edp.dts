@@ -41,132 +41,47 @@
  */
 
 /dts-v1/;
-
-#include "rk3399-excavator-sapphire.dtsi"
-#include "rk3399-android.dtsi"
-#include "rk3399-vop-clk-set.dtsi"
+#include "rk3399-sapphire-excavator-edp.dtsi"
 
 / {
 	model = "Rockchip RK3399 Excavator Board edp (Android)";
 	compatible = "rockchip,android", "rockchip,rk3399-excavator-edp", "rockchip,rk3399";
-
-	vcc_lcd: vcc-lcd {
-		compatible = "regulator-fixed";
-		regulator-name = "vcc_lcd";
-		gpio = <&gpio4 30 GPIO_ACTIVE_HIGH>;
-		startup-delay-us = <20000>;
-		enable-active-high;
-		regulator-min-microvolt = <3300000>;
-		regulator-max-microvolt = <3300000>;
-		regulator-boot-on;
-		vin-supply = <&vcc5v0_sys>;
-	};
-
-	panel: panel {
-		compatible = "simple-panel";
-		backlight = <&backlight>;
-		power-supply = <&vcc_lcd>;
-		enable-gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
-		prepare-delay-ms = <20>;
-		enable-delay-ms = <20>;
-
-		display-timings {
-			native-mode = <&timing0>;
-
-			timing0: timing0 {
-				clock-frequency = <200000000>;
-				hactive = <1536>;
-				vactive = <2048>;
-				hfront-porch = <12>;
-				hsync-len = <16>;
-				hback-porch = <48>;
-				vfront-porch = <8>;
-				vsync-len = <4>;
-				vback-porch = <8>;
-				hsync-active = <0>;
-				vsync-active = <0>;
-				de-active = <0>;
-				pixelclk-active = <0>;
-			};
-		};
-
-		ports {
-			panel_in: endpoint {
-				remote-endpoint = <&edp_out>;
-			};
-		};
-	};
-
-	test-power {
-		status = "okay";
-	};
-
-	rt5651-sound {
-		status = "disabled";
-	};
-
-	hdmiin-sound {
-		compatible = "rockchip,rockchip-rt5651-tc358749x-sound";
-		rockchip,cpu = <&i2s0>;
-		rockchip,codec = <&rt5651 &rt5651 &tc358749x>;
-		status = "okay";
-	};
 };
 
-&backlight {
-	status = "okay";
-	enable-gpios = <&gpio4 29 GPIO_ACTIVE_HIGH>;
-};
-
-&edp {
-	status = "okay";
-	force-hpd;
-
-	ports {
-		port@1 {
-			reg = <1>;
-
-			edp_out: endpoint {
-				remote-endpoint = <&panel_in>;
-			};
+&firmware_android {
+	compatible = "android,firmware";
+	fstab {
+		compatible = "android,fstab";
+		system {
+			compatible = "android,system";
+			dev = "/dev/block/by-name/system";
+			type = "ext4";
+			mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
+			fsmgr_flags = "wait,verify";
+		};
+		vendor {
+			compatible = "android,vendor";
+			dev = "/dev/block/by-name/vendor";
+			type = "ext4";
+			mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
+			fsmgr_flags = "wait,verify";
 		};
 	};
 };
 
-&edp_in_vopl {
+&dp_sound {
 	status = "disabled";
-};
-
-&hdmi {
-	status = "okay";
-};
-
-&hdmi_in_vopb {
-	status = "disabled";
-};
-
-&rt5651 {
-	status = "okay";
-};
-
-&cdn_dp {
-	status = "okay";
-	extcon = <&fusb0>;
-	phys = <&tcphy0_dp>;
 };
 
 &hdmi_dp_sound {
-	status = "okay";
-};
-
-&dp_in_vopb {
 	status = "disabled";
 };
 
-&i2s2 {
+&hdmi_sound {
 	status = "okay";
 };
 
+<<<<<<< HEAD
 &i2c1 {
 	status = "okay";
 
@@ -258,6 +173,8 @@
 	};
 };
 
+=======
+>>>>>>> rk_origin/release-4.4
 &isp0 {
 	status = "okay";
 };
@@ -265,6 +182,7 @@
 &isp1 {
 	status = "okay";
 };
+<<<<<<< HEAD
 
 &isp0_mmu {
 	status = "okay";
@@ -408,3 +326,5 @@
 	};
 };
 
+=======
+>>>>>>> rk_origin/release-4.4

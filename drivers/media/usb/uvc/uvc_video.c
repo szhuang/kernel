@@ -163,14 +163,27 @@ static void uvc_fixup_video_ctrl(struct uvc_streaming *stream,
 	}
 }
 
+static size_t uvc_video_ctrl_size(struct uvc_streaming *stream)
+{
+	/*
+	 * Return the size of the video probe and commit controls, which depends
+	 * on the protocol version.
+	 */
+	if (stream->dev->uvc_version < 0x0110)
+		return 26;
+	else if (stream->dev->uvc_version < 0x0150)
+		return 34;
+	else
+		return 48;
+}
+
 static int uvc_get_video_ctrl(struct uvc_streaming *stream,
 	struct uvc_streaming_control *ctrl, int probe, __u8 query)
 {
+	__u16 size = uvc_video_ctrl_size(stream);
 	__u8 *data;
-	__u16 size;
 	int ret;
 
-	size = stream->dev->uvc_version >= 0x0110 ? 34 : 26;
 	if ((stream->dev->quirks & UVC_QUIRK_PROBE_DEF) &&
 			query == UVC_GET_DEF)
 		return -EIO;
@@ -225,7 +238,7 @@ static int uvc_get_video_ctrl(struct uvc_streaming *stream,
 	ctrl->dwMaxVideoFrameSize = get_unaligned_le32(&data[18]);
 	ctrl->dwMaxPayloadTransferSize = get_unaligned_le32(&data[22]);
 
-	if (size == 34) {
+	if (size >= 34) {
 		ctrl->dwClockFrequency = get_unaligned_le32(&data[26]);
 		ctrl->bmFramingInfo = data[30];
 		ctrl->bPreferedVersion = data[31];
@@ -254,11 +267,10 @@ out:
 static int uvc_set_video_ctrl(struct uvc_streaming *stream,
 	struct uvc_streaming_control *ctrl, int probe)
 {
+	__u16 size = uvc_video_ctrl_size(stream);
 	__u8 *data;
-	__u16 size;
 	int ret;
 
-	size = stream->dev->uvc_version >= 0x0110 ? 34 : 26;
 	data = kzalloc(size, GFP_KERNEL);
 	if (data == NULL)
 		return -ENOMEM;
@@ -275,7 +287,7 @@ static int uvc_set_video_ctrl(struct uvc_streaming *stream,
 	put_unaligned_le32(ctrl->dwMaxVideoFrameSize, &data[18]);
 	put_unaligned_le32(ctrl->dwMaxPayloadTransferSize, &data[22]);
 
-	if (size == 34) {
+	if (size >= 34) {
 		put_unaligned_le32(ctrl->dwClockFrequency, &data[26]);
 		data[30] = ctrl->bmFramingInfo;
 		data[31] = ctrl->bPreferedVersion;
@@ -1501,6 +1513,7 @@ static void uvc_video_complete(struct urb *urb)
 			buf_meta = list_first_entry(&qmeta->irqqueue,
 						    struct uvc_buffer, queue);
 		spin_unlock_irqrestore(&qmeta->irqlock, flags);
+<<<<<<< HEAD
 	}
 
 	/*
@@ -1519,6 +1532,26 @@ static void uvc_video_complete(struct urb *urb)
 		return;
 	}
 
+=======
+	}
+
+	/*
+	 * Process the URB headers, and optionally queue expensive memcpy tasks
+	 * to be deferred to a work queue.
+	 */
+	stream->decode(uvc_urb, buf, buf_meta);
+
+	/* If no async work is needed, resubmit the URB immediately. */
+	if (!uvc_urb->async_operations) {
+		ret = usb_submit_urb(uvc_urb->urb, GFP_ATOMIC);
+		if (ret < 0)
+			uvc_printk(KERN_ERR,
+				   "Failed to resubmit video URB (%d).\n",
+				   ret);
+		return;
+	}
+
+>>>>>>> rk_origin/release-4.4
 	INIT_WORK(&uvc_urb->work, uvc_video_copy_data_work);
 	queue_work(stream->async_wq, &uvc_urb->work);
 }
@@ -1626,9 +1659,15 @@ static void uvc_uninit_video(struct uvc_streaming *stream, int free_buffers)
 	 */
 	for_each_uvc_urb(uvc_urb, stream)
 		usb_poison_urb(uvc_urb->urb);
+<<<<<<< HEAD
 
 	flush_workqueue(stream->async_wq);
 
+=======
+
+	flush_workqueue(stream->async_wq);
+
+>>>>>>> rk_origin/release-4.4
 	for_each_uvc_urb(uvc_urb, stream) {
 		usb_free_urb(uvc_urb->urb);
 		uvc_urb->urb = NULL;

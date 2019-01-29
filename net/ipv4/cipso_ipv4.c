@@ -1582,7 +1582,7 @@ static int cipso_v4_parsetag_loc(const struct cipso_v4_doi *doi_def,
  *
  * Description:
  * Parse the packet's IP header looking for a CIPSO option.  Returns a pointer
- * to the start of the CIPSO option on success, NULL if one if not found.
+ * to the start of the CIPSO option on success, NULL if one is not found.
  *
  */
 unsigned char *cipso_v4_optptr(const struct sk_buff *skb)
@@ -1592,6 +1592,7 @@ unsigned char *cipso_v4_optptr(const struct sk_buff *skb)
 	int optlen;
 	int taglen;
 
+<<<<<<< HEAD
 	for (optlen = iph->ihl*4 - sizeof(struct iphdr); optlen > 0; ) {
 		switch (optptr[0]) {
 		case IPOPT_CIPSO:
@@ -1604,6 +1605,23 @@ unsigned char *cipso_v4_optptr(const struct sk_buff *skb)
 		default:
 			taglen = optptr[1];
 		}
+=======
+	for (optlen = iph->ihl*4 - sizeof(struct iphdr); optlen > 1; ) {
+		switch (optptr[0]) {
+		case IPOPT_END:
+			return NULL;
+		case IPOPT_NOOP:
+			taglen = 1;
+			break;
+		default:
+			taglen = optptr[1];
+		}
+		if (!taglen || taglen > optlen)
+			return NULL;
+		if (optptr[0] == IPOPT_CIPSO)
+			return optptr;
+
+>>>>>>> rk_origin/release-4.4
 		optlen -= taglen;
 		optptr += taglen;
 	}

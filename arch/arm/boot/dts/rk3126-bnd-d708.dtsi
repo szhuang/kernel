@@ -237,6 +237,13 @@
 	};
 };
 
+<<<<<<< HEAD
+=======
+&route_dsi {
+	status = "okay";
+};
+
+>>>>>>> rk_origin/release-4.4
 &dmc {
 	center-supply = <&vdd_log>;
 };
@@ -513,10 +520,13 @@
 	status = "okay";
 };
 
+<<<<<<< HEAD
 &mipi_dphy {
 	status = "okay";
 };
 
+=======
+>>>>>>> rk_origin/release-4.4
 &nandc {
 	status = "okay";
 };
@@ -579,10 +589,13 @@
 	status = "okay";
 };
 
+<<<<<<< HEAD
 &route_dsi {
 	status = "okay";
 };
 
+=======
+>>>>>>> rk_origin/release-4.4
 &saradc {
 	status = "okay";
 	vref-supply = <&vccadc_ref>;

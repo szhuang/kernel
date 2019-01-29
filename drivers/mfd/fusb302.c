@@ -354,7 +354,7 @@ static void platform_set_vbus_lvl_enable(struct fusb30x_chip *chip, int vbus_5v,
 
 	gpio_vbus_value = gpiod_get_value(chip->gpio_vbus_5v);
 	if (chip->gpio_vbus_5v) {
-		gpiod_set_raw_value(chip->gpio_vbus_5v, vbus_5v);
+		gpiod_set_value(chip->gpio_vbus_5v, vbus_5v);
 		/* Only set state here, don't sync notifier to PMIC */
 		extcon_set_state(chip->extcon, EXTCON_USB_VBUS_EN, vbus_5v);
 	} else {
@@ -364,7 +364,7 @@ static void platform_set_vbus_lvl_enable(struct fusb30x_chip *chip, int vbus_5v,
 	}
 
 	if (chip->gpio_vbus_other)
-		gpiod_set_raw_value(chip->gpio_vbus_5v, vbus_other);
+		gpiod_set_value(chip->gpio_vbus_other, vbus_other);
 
 	if (chip->gpio_discharge && !vbus_5v && gpio_vbus_value) {
 		gpiod_set_value(chip->gpio_discharge, 1);
@@ -977,6 +977,7 @@ static int pd_dfp_dp_get_pin_assignment(struct fusb30x_chip *chip,
 					uint32_t caps, uint32_t status)
 {
 	uint32_t pin_caps;
+<<<<<<< HEAD
 
 	/* revisit with DFP that can be a sink */
 	pin_caps = PD_DP_PIN_CAPS(caps);
@@ -999,6 +1000,30 @@ static int pd_dfp_dp_get_pin_assignment(struct fusb30x_chip *chip,
 	if (!pin_caps)
 		return 0;
 
+=======
+
+	/* revisit with DFP that can be a sink */
+	pin_caps = PD_DP_PIN_CAPS(caps);
+
+	/* if don't want multi-function then ignore those pin configs */
+	if (!PD_VDO_DPSTS_MF_PREF(status))
+		pin_caps &= ~MODE_DP_PIN_MF_MASK;
+
+	/* revisit if DFP drives USB Gen 2 signals */
+	if (PD_DP_SIGNAL_GEN2(caps))
+		pin_caps &= ~MODE_DP_PIN_DP_MASK;
+	else
+		pin_caps &= ~MODE_DP_PIN_BR2_MASK;
+
+	/* if C/D present they have precedence over E/F for USB-C->USB-C */
+	if (pin_caps & (MODE_DP_PIN_C | MODE_DP_PIN_D))
+		pin_caps &= ~(MODE_DP_PIN_E | MODE_DP_PIN_F);
+
+	/* returns undefined for zero */
+	if (!pin_caps)
+		return 0;
+
+>>>>>>> rk_origin/release-4.4
 	/* choosing higher pin config over lower ones */
 	return 1 << (31 - __builtin_clz(pin_caps));
 }
@@ -3124,7 +3149,7 @@ static int fusb_initialize_gpio(struct fusb30x_chip *chip)
 		dev_warn(chip->dev,
 			 "Could not get named GPIO for VBus5V!\n");
 	else
-		gpiod_set_raw_value(chip->gpio_vbus_5v, 0);
+		gpiod_set_value(chip->gpio_vbus_5v, 0);
 
 	chip->gpio_vbus_other = devm_gpiod_get_optional(chip->dev,
 							"vbus-other",
@@ -3133,7 +3158,7 @@ static int fusb_initialize_gpio(struct fusb30x_chip *chip)
 		dev_warn(chip->dev,
 			 "Could not get named GPIO for VBusOther!\n");
 	else
-		gpiod_set_raw_value(chip->gpio_vbus_other, 0);
+		gpiod_set_value(chip->gpio_vbus_other, 0);
 
 	chip->gpio_discharge = devm_gpiod_get_optional(chip->dev, "discharge",
 						       GPIOD_OUT_LOW);

@@ -48,6 +48,19 @@ int snand_vendor_write(u32 sec, u32 n_sec, void *p_data)
 	return sftl_vendor_write(sec, n_sec, p_data);
 }
 
+<<<<<<< HEAD
+=======
+int snand_gc(void)
+{
+	return sftl_gc();
+}
+
+int snand_discard(u32 sec, u32 n_sec)
+{
+	return sftl_discard(sec, n_sec);
+}
+
+>>>>>>> rk_origin/release-4.4
 void snand_deinit(void)
 {
 	sftl_deinit();

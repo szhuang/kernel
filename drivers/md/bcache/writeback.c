@@ -462,8 +462,15 @@ static int bch_writeback_thread(void *arg)
 			 * data on cache. BCACHE_DEV_DETACHING flag is set in
 			 * bch_cached_dev_detach().
 			 */
+<<<<<<< HEAD
 			if (test_bit(BCACHE_DEV_DETACHING, &dc->disk.flags))
 				break;
+=======
+			if (test_bit(BCACHE_DEV_DETACHING, &dc->disk.flags)) {
+				up_write(&dc->writeback_lock);
+				break;
+			}
+>>>>>>> rk_origin/release-4.4
 		}
 
 		up_write(&dc->writeback_lock);

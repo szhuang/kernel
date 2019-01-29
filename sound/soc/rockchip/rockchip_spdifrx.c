@@ -216,6 +216,10 @@ static bool rk_spdifrx_volatile_reg(struct device *dev, unsigned int reg)
 	case SPDIFRX_FIFOCTRL:
 	case SPDIFRX_INTSR:
 	case SPDIFRX_INTCLR:
+<<<<<<< HEAD
+=======
+	case SPDIFRX_SMPDR:
+>>>>>>> rk_origin/release-4.4
 	case SPDIFRX_BURSTINFO:
 		return true;
 	default:
@@ -223,6 +227,19 @@ static bool rk_spdifrx_volatile_reg(struct device *dev, unsigned int reg)
 	}
 }
 
+<<<<<<< HEAD
+=======
+static bool rk_spdifrx_precious_reg(struct device *dev, unsigned int reg)
+{
+	switch (reg) {
+	case SPDIFRX_SMPDR:
+		return true;
+	default:
+		return false;
+	}
+}
+
+>>>>>>> rk_origin/release-4.4
 static const struct regmap_config rk_spdifrx_regmap_config = {
 	.reg_bits = 32,
 	.reg_stride = 4,
@@ -231,6 +248,10 @@ static const struct regmap_config rk_spdifrx_regmap_config = {
 	.writeable_reg = rk_spdifrx_wr_reg,
 	.readable_reg = rk_spdifrx_rd_reg,
 	.volatile_reg = rk_spdifrx_volatile_reg,
+<<<<<<< HEAD
+=======
+	.precious_reg = rk_spdifrx_precious_reg,
+>>>>>>> rk_origin/release-4.4
 	.cache_type = REGCACHE_FLAT,
 };
 

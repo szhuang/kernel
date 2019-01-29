@@ -6,10 +6,11 @@ config VIDEO_ROCKCHIP_ISP1
 	select VIDEOBUF2_DMA_CONTIG
 	select VIDEOBUF2_VMALLOC
 	select V4L2_FWNODE
-	select VIDEO_ROCKCHIP_ISP_DPHY_SY
+	select PHY_ROCKCHIP_MIPI_RX
 	default n
 	help
 	  Support for ISP1 on the rockchip SoC.
+<<<<<<< HEAD
 
 config VIDEO_ROCKCHIP_ISP_DPHY_SY
 	tristate "Rockchip Image Signal Processing v1 Dphy driver"
@@ -18,3 +19,5 @@ config VIDEO_ROCKCHIP_ISP_DPHY_SY
 	default n
 	help
 	  Support for ISP MIPI Synopsys DPHY on the rockchip SoC.
+=======
+>>>>>>> rk_origin/release-4.4

@@ -13,6 +13,10 @@
 
 &firmware_android {
 	compatible = "android,firmware";
+<<<<<<< HEAD
+=======
+	boot_devices = "ff390000.dwmmc,ff3b0000.nandc";
+>>>>>>> rk_origin/release-4.4
 	vbmeta {
 		compatible = "android,vbmeta";
 		parts = "vbmeta,boot,system,vendor,dtbo";
@@ -21,7 +25,11 @@
 		compatible = "android,fstab";
 		vendor {
 			compatible = "android,vendor";
+<<<<<<< HEAD
 			dev = "/dev/block/platform/ff390000.dwmmc/by-name/vendor";
+=======
+			dev = "/dev/block/by-name/vendor";
+>>>>>>> rk_origin/release-4.4
 			type = "ext4";
 			mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
 			fsmgr_flags = "wait,avb";

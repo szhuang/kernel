@@ -48,8 +48,23 @@ int sftl_flash_vendor_read(u32 sec, u32 n_sec, void *p_data)
 }
 
 int sftl_flash_vendor_write(u32 sec, u32 n_sec, void *p_data)
+<<<<<<< HEAD
 {
 	return sftl_vendor_write(sec, n_sec, p_data);
+=======
+{
+	return sftl_vendor_write(sec, n_sec, p_data);
+}
+
+int sftl_flash_gc(void)
+{
+	return sftl_gc();
+}
+
+int sftl_flash_discard(u32 sec, u32 n_sec)
+{
+	return sftl_discard(sec, n_sec);
+>>>>>>> rk_origin/release-4.4
 }
 
 void sftl_flash_deinit(void)
