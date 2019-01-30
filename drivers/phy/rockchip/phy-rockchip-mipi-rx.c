@@ -1445,7 +1445,7 @@ static int rockchip_mipidphy_probe(struct platform_device *pdev)
 	sd = &priv->sd;
 	v4l2_subdev_init(sd, &mipidphy_subdev_ops);
 	sd->flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
-	snprintf(sd->name, sizeof(sd->name), "rockchip-mipi-dphy-rx");
+	snprintf(sd->name, sizeof(sd->name), "rockchip-sy-mipi-dphy");
 	sd->dev = dev;
 
 	platform_set_drvdata(pdev, &sd->entity);
@@ -1481,7 +1481,7 @@ static struct platform_driver rockchip_isp_mipidphy_driver = {
 	.probe = rockchip_mipidphy_probe,
 	.remove = rockchip_mipidphy_remove,
 	.driver = {
-			.name = "rockchip-mipi-dphy-rx",
+			.name = "rockchip-sy-mipi-dphy",
 			.pm = &rockchip_mipidphy_pm_ops,
 			.of_match_table = rockchip_mipidphy_match_id,
 	},
