@@ -73,33 +73,6 @@
 		rockchip,irq-mode-enable = <1>;  /* If enable uart uses irq instead of fiq */
 	};
 
-	display-subsystem {
-		status = "okay";
-
-		ports = <&vopb_out>, <&vopl_out>;
-		logo-memory-region = <&drm_logo>;
-
-		route {
-			route_hdmi:route-hdmi {
-				status = "okay";
-				logo,uboot = "logo.bmp";
-				logo,kernel = "logo_kernel.bmp";
-				logo,mode = "center";
-				charge_logo,mode = "center";
-				connect = <&vopb_out_hdmi>;
-			};
-
-			route_dsi0:route-dsi0 {
-				status = "okay";
-				logo,uboot = "logo.bmp";
-				logo,kernel = "logo_kernel.bmp";
-				logo,mode = "center";
-				charge_logo,mode = "center";
-				connect = <&vopl_out_dsi0>;
-			};
-		};
-	};
-
 	adc-keys {
 		compatible = "adc-keys";
 		io-channels = <&saradc 1>;
@@ -139,13 +112,53 @@
 		};
 	};
 
+	dwc_control_usb:dwc-control-usb@ff770284 {
+		compatible = "rockchip,rk3288-dwc-control-usb";
+		status = "okay";
+		reg = <0x0 0xff770284 0x0 0x04>, <0x0 0xff770288 0x0 0x04>,
+		<0x0 0xff7702cc 0x0 0x04>, <0x0 0xff7702d4 0x0 0x04>,
+		<0x0 0xff770320 0x0 0x14>, <0x0 0xff770334 0x0 0x14>,
+		<0x0 0xff770348 0x0 0x10>, <0x0 0xff770358 0x0 0x08>,
+		<0x0 0xff770360 0x0 0x08>;
+		reg-names = "GRF_SOC_STATUS1","GRF_SOC_STATUS2",
+		"GRF_SOC_STATUS19", "GRF_SOC_STATUS21",
+		"GRF_UOC0_BASE", "GRF_UOC1_BASE",
+		"GRF_UOC2_BASE", "GRF_UOC3_BASE",
+		"GRF_UOC4_BASE";
+		interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>,
+		<GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>,
+		<GIC_SPI 95 IRQ_TYPE_LEVEL_HIGH>,
+		<GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>,
+		<GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
+		interrupt-names = "otg_id", "otg_bvalid",
+		"otg_linestate", "host0_linestate",
+		"host1_linestate";
+		clocks = <&cru HCLK_USB_PERI>;
+		clock-names = "hclk_usb_peri";
+
+		otg_drv_gpio = <&gpio0 12 GPIO_ACTIVE_HIGH>;
+		host_drv_gpio = <&gpio7 8 GPIO_ACTIVE_HIGH>;
+		rockchip,remote_wakeup;
+		rockchip,usb_irq_wakeup;
+
+		usb_bc {
+			compatible = "synopsys,phy";
+			rk_usb,bvalid     = <0x288 14 1>;
+			rk_usb,iddig      = <0x288 17 1>;
+			rk_usb,dcdenb     = <0x328 14 1>;
+			rk_usb,vdatsrcenb = <0x328  7 1>;
+			rk_usb,vdatdetenb = <0x328  6 1>;
+			rk_usb,chrgsel    = <0x328  5 1>;
+			rk_usb,chgdet     = <0x2cc 23 1>;
+			rk_usb,fsvminus   = <0x2cc 25 1>;
+			rk_usb,fsvplus    = <0x2cc 24 1>;
+		};
+	};
+
 	sdio_pwrseq:sdio-pwrseq {
 		compatible = "mmc-pwrseq-simple";
 		clocks = <&rk818 1>;
 		clock-names = "ext_clock";
-		pinctrl-names = "default";
-		pinctrl-0 = <&wifi_enable_h>;
-
 		/*
 		 * On the module itself this is one of these (depending
 		 * on the actual card populated):
@@ -730,9 +743,10 @@
 			compatible = "rk818-battery";
 			//pinctrl-names = "default";
 			//pinctrl-0 = <&dc_irq_gpio>;
-			ocv_table = <2750 2950 3150 3350 3550 3750 3780
-						3810 3840 3870 3900 3950 4000 4010
-						4030 4050 4070 4090 4110 4230 4250>;
+			ocv_table = <
+			2750 2950 3150 3350 3550 3750 3780
+			3810 3840 3870 3900 3950 4000 4010
+			4030 4050 4070 4090 4110 4230 4250>;
 			design_capacity = <2800>;
 			design_qmax = <2800>;
 			bat_res = <85>;
@@ -953,7 +967,8 @@
 		status = "okay";
 		compatible = "ovti,ov5648";
 		reg = <0x36>; //6c , 36 ,6a,1B,4a,6f
-		clocks = <&cru SCLK_VIP_OUT>;
+		//clocks = <&cru SCLK_VIP_OUT>;
+		clocks = <&ext_cam_clk>;
 		clock-names="xvclk";
 		//pinctrl-name="default";
 		//pinctrl-0 = <&cam_pd>;
