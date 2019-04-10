@@ -17,7 +17,7 @@
  * Set Firmware Path
  */
  
-#define VENDOR_ETC_FIRMWARE "/vendor/etc/firmware/"
+#define VENDOR_ETC_FIRMWARE "/lib/firmware/rkwifi/"
 #define SYSTEM_ETC_FIRMWARE "/lib/firmware/rkwifi/"
 char ANDROID_FW_PATH[64] = {0};
 
