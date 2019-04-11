@@ -1340,7 +1340,7 @@ static int __ov5648_power_on(struct ov5648 *ov5648) {
 	ret = regulator_bulk_enable(OV5648_NUM_SUPPLIES, ov5648->supplies);
 	if (ret < 0) {
 		dev_err(dev, "Failed to enable regulators\n");
-		goto disable_clk;
+		//goto disable_clk;
 		}
 #ifdef _DEBUG_
 	else {
@@ -1364,8 +1364,8 @@ static int __ov5648_power_on(struct ov5648 *ov5648) {
 
 	usleep_range(delay_us, delay_us * 10);
 
-disable_clk:
-	clk_disable_unprepare(ov5648->xvclk);
+//disable_clk:
+//	clk_disable_unprepare(ov5648->xvclk);
 
 	return ret;
 	}

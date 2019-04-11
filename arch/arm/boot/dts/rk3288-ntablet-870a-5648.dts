@@ -222,7 +222,11 @@
 				sound-dai = <&i2s>;
 			};
 			codec {
+<<<<<<< HEAD
 				//sound-dai = <&hdmi>;
+=======
+				sound-dai = <&hdmi>;
+>>>>>>> 2d3880e5ff42
 			};
 		};
 	};
@@ -296,6 +300,7 @@
 		clock-output-names = "xin32k";
 		#clock-cells = <0>;
 	};
+<<<<<<< HEAD
 
 	ext_cam_clk:external-camera-clock {
 		compatible = "fixed-clock";
@@ -303,6 +308,8 @@
 		clock-output-names = "CLK_CAMERA_24MHZ";
 		#clock-cells = <0>;
 	};
+=======
+>>>>>>> 2d3880e5ff42
 
 	vcc_sys:vsys-regulator {
 		compatible = "regulator-fixed";
@@ -755,7 +762,7 @@
 			max_chrg_voltage = <4350>;
 			sleep_enter_current = <300>;
 			sleep_exit_current = <300>;
-			sleep_filter_current = <100>;
+			//sleep_filter_current = <100>;
 			power_off_thresd = <2800>;
 			zero_algorithm_vol = <3950>;
 			fb_temperature = <105>;
@@ -839,12 +846,17 @@
 	status = "okay";
 };
 
-&tsadc {
+//&tsadc {
 	//rockchip,hw-tshut-mode = <1>; /* tshut mode 0:CRU 1:GPIO */
-	rockchip,hw-tshut-polarity = <1>; /* tshut polarity 0:LOW 1:HIGH */
+	//rockchip,hw-tshut-polarity = <0>; /* tshut polarity 0:LOW 1:HIGH */
 	//pinctrl-1 = <&otp_out>;
+<<<<<<< HEAD
 	status = "okay";
 };
+=======
+	//status = "okay";
+//};
+>>>>>>> 2d3880e5ff42
 
 &rockchip_suspend {
 	status = "okay";
