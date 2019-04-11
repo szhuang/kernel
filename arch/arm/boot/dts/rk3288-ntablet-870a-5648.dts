@@ -222,11 +222,7 @@
 				sound-dai = <&i2s>;
 			};
 			codec {
-<<<<<<< HEAD
-				//sound-dai = <&hdmi>;
-=======
 				sound-dai = <&hdmi>;
->>>>>>> 2d3880e5ff42
 			};
 		};
 	};
@@ -300,16 +296,6 @@
 		clock-output-names = "xin32k";
 		#clock-cells = <0>;
 	};
-<<<<<<< HEAD
-
-	ext_cam_clk:external-camera-clock {
-		compatible = "fixed-clock";
-		clock-frequency = <24000000>;
-		clock-output-names = "CLK_CAMERA_24MHZ";
-		#clock-cells = <0>;
-	};
-=======
->>>>>>> 2d3880e5ff42
 
 	vcc_sys:vsys-regulator {
 		compatible = "regulator-fixed";
@@ -782,7 +768,7 @@
 
 &sdio0 {
 	status = "okay";
-	max-frequency = <148500000>;
+	max-frequency = <150000000>;
 
 	bus-width = <4>;
 	cap-sd-highspeed;
@@ -850,13 +836,8 @@
 	//rockchip,hw-tshut-mode = <1>; /* tshut mode 0:CRU 1:GPIO */
 	//rockchip,hw-tshut-polarity = <0>; /* tshut polarity 0:LOW 1:HIGH */
 	//pinctrl-1 = <&otp_out>;
-<<<<<<< HEAD
-	status = "okay";
-};
-=======
 	//status = "okay";
 //};
->>>>>>> 2d3880e5ff42
 
 &rockchip_suspend {
 	status = "okay";
@@ -979,8 +960,7 @@
 		status = "okay";
 		compatible = "ovti,ov5648";
 		reg = <0x36>; //6c , 36 ,6a,1B,4a,6f
-		//clocks = <&cru SCLK_VIP_OUT>;
-		clocks = <&ext_cam_clk>;
+		clocks = <&cru SCLK_VIP_OUT>;
 		clock-names="xvclk";
 		//pinctrl-name="default";
 		//pinctrl-0 = <&cam_pd>;
