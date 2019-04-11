@@ -297,13 +297,6 @@
 		#clock-cells = <0>;
 	};
 
-	ext_cam_clk:external-camera-clock {
-		compatible = "fixed-clock";
-		clock-frequency = <24000000>;
-		clock-output-names = "CLK_CAMERA_24MHZ";
-		#clock-cells = <0>;
-	};
-
 	vcc_sys:vsys-regulator {
 		compatible = "regulator-fixed";
 		regulator-name = "vcc_sys";
@@ -968,8 +961,6 @@
 		compatible = "ovti,ov5648";
 		reg = <0x36>; //6c , 36 ,6a,1B,4a,6f
 		clocks = <&cru SCLK_VIP_OUT>;
-		//clocks = <&cru SCLK_CIF_OUT>;
-		//clocks = <&ext_cam_clk>;
 		clock-names="xvclk";
 		//pinctrl-name="default";
 		//pinctrl-0 = <&cam_pd>;
