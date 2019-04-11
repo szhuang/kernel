@@ -967,9 +967,9 @@
 		status = "okay";
 		compatible = "ovti,ov5648";
 		reg = <0x36>; //6c , 36 ,6a,1B,4a,6f
-		//clocks = <&cru SCLK_VIP_OUT>;
+		clocks = <&cru SCLK_VIP_OUT>;
 		//clocks = <&cru SCLK_CIF_OUT>;
-		clocks = <&ext_cam_clk>;
+		//clocks = <&ext_cam_clk>;
 		clock-names="xvclk";
 		//pinctrl-name="default";
 		//pinctrl-0 = <&cam_pd>;
@@ -986,9 +986,6 @@
 			ov5648_out:endpoint {
 				remote-endpoint = <&ov5648_in>;
 				data-lanes = <1 2>;
-				clock-noncontinuous;
-				link-frequencies =
-						/bits/ 64 <24000000>;
 			};
 		};
 	};
