@@ -941,11 +941,11 @@
 };
 
 &hdmi_in_vopl {
-	status = "okay";
+	status = "disabled";
 };
 
 &hdmi_in_vopb {
-	status = "disabled";
+	status = "okay";
 };
 
 &hdmi {
@@ -953,10 +953,11 @@
 	#size-cells = <0>;
 	#sound-dai-cells = <0>;
 	status = "okay";
+	pinctrl-0 = <&hdmi_ddc>, <&hdmi_cec>;
 };
 
 &route_hdmi {
-	connect = <&vopl_out_hdmi>;
+	connect = <&vopb_out_hdmi>;
 	status = "okay";
 };
 
