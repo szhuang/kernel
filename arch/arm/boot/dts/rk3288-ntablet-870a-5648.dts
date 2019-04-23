@@ -571,7 +571,7 @@
 			regulator-off-in-suspend;
 		};
 	};
-
+	
 	rk818:pmic@1c {
 		compatible = "rockchip,rk818";
 		reg = <0x1c>;
@@ -617,7 +617,7 @@
 				regulator-boot-on;
 				regulator-min-microvolt = <800000>;
 				regulator-max-microvolt = <1250000>;
-				regulator-ramp-delay = <6001>;
+				regulator-ramp-delay = <6000>;
 				regulator-state-mem {
 					regulator-on-in-suspend;
 					regulator-suspend-microvolt = <1000000>;
@@ -882,12 +882,10 @@
 	status = "okay";
 };
 
-&tsadc {
-	rockchip,hw-tshut-mode = <1>; /* tshut mode 0:CRU 1:GPIO */
-	rockchip,hw-tshut-polarity = <0>; /* tshut polarity 0:LOW 1:HIGH */
-	pinctrl-1 = <&otp_out>;
-	status = "okay";
-};
+//&tsadc {
+	//rockchip,hw-tshut-polarity = <1>; /* tshut polarity 0:LOW 1:HIGH */
+	//status = "okay";
+//};
 
 &rockchip_suspend {
 	status = "okay";
@@ -1013,16 +1011,14 @@
 		reg = <0x36>; //6c , 36 ,6a,1B,4a,6f
 		clocks = <&cru SCLK_VIP_OUT>;
 		clock-names="xvclk";
-		//pinctrl-name="default";
-		//pinctrl-0 = <&cam_pd>;
 		dovdd-supply = <&dovdd_1v8>;
 		avdd-supply = <&avdd_2v8>;
 		dvdd-supply = <&dvdd_1v5>;
-		dvp-supply = <&vcc18_dvp>;
-		//dvp-supply = <&vcc28_dvp>;
-		//avdd-supply = <&vcc28_cam>;
-		//dvdd-supply = <&vcc15_cam>;
-		//dovdd-supply = <&vcc18_cam>;
+		rockchip,camera-module-index = <0>;
+		rockchip,camera-module-facing = "back";
+		rockchip,camera-module-name = "CameraKing";
+		rockchip,camera-module-lens-name = "CHT-842B-MD";
+		power-gpios = <&gpio0 17 GPIO_ACTIVE_LOW>;
 		pwdn-gpios = <&gpio2 15 GPIO_ACTIVE_HIGH>;
 		port {
 			ov5648_out:endpoint {
@@ -1113,9 +1109,9 @@
 	status = "okay";
 };
 
-//&cif_isp0 {
-//	status = "okay";
-//};
+&cif_isp0 {
+	status = "disabled";
+};
 
 &pinctrl {
 	backlight {
