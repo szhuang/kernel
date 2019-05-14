@@ -337,7 +337,7 @@
 		enable-gpios = <&gpio7 1 GPIO_ACTIVE_HIGH>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&bl_en>;
-		pwms = <&pwm0 0 1000000 0>;
+		pwms = <&pwm0 0 50000 0>;
 	};
 
 	xin32k:xin32k {
