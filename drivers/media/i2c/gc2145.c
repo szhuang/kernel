@@ -38,7 +38,8 @@
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/videodev2.h>
-
+#include <linux/version.h>
+#include <linux/rk-camera-module.h>
 #include <media/media-entity.h>
 #include <media/v4l2-common.h>
 #include <media/v4l2-ctrls.h>
@@ -49,6 +50,7 @@
 #include <media/v4l2-mediabus.h>
 #include <media/v4l2-subdev.h>
 
+#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x0)
 #define DRIVER_NAME "gc2145"
 #define GC2145_PIXEL_RATE		(120 * 1000 * 1000)
 
@@ -120,6 +122,10 @@ struct gc2145 {
 	const struct gc2145_framesize *framesize_cfg;
 	unsigned int cfg_num;
 	int streaming;
+	u32 module_index;
+	const char *module_facing;
+	const char *module_name;
+	const char *len_name;
 };
 
 static const struct sensor_register gc2145_dvp_init_regs[] = {
@@ -158,7 +164,7 @@ static const struct sensor_register gc2145_dvp_init_regs[] = {
 	{0x20, 0x03},
 	{0x21, 0x40},
 	{0x22, 0xa0},
-	{0x24, 0x16},
+	{0x24, 0x3f},
 	{0x25, 0x01},
 	{0x26, 0x10},
 	{0x2d, 0x60},
@@ -1815,6 +1821,8 @@ static int gc2145_write(struct i2c_client *client, u8 reg, u8 val)
 	u8 buf[2];
 	int ret;
 
+	dev_dbg(&client->dev, "write reg(0x%x val:0x%x)!\n", reg, val);
+
 	buf[0] = reg & 0xFF;
 	buf[1] = val;
 
@@ -2091,7 +2099,10 @@ static int gc2145_s_stream(struct v4l2_subdev *sd, int on)
 	struct gc2145 *gc2145 = to_gc2145(sd);
 	int ret = 0;
 
-	dev_dbg(&client->dev, "%s: on: %d\n", __func__, on);
+	dev_info(&client->dev, "%s: on: %d, %dx%d@%d\n", __func__, on,
+				gc2145->frame_size->width,
+				gc2145->frame_size->height,
+				gc2145->frame_size->fps);
 
 	mutex_lock(&gc2145->lock);
 
@@ -2104,23 +2115,8 @@ static int gc2145_s_stream(struct v4l2_subdev *sd, int on)
 		/* Stop Streaming Sequence */
 		gc2145_set_streaming(gc2145, on);
 		gc2145->streaming = on;
-		if (!IS_ERR(gc2145->pwdn_gpio)) {
-			gpiod_set_value_cansleep(gc2145->pwdn_gpio, 1);
-			usleep_range(2000, 5000);
-		}
 		goto unlock;
 	}
-	if (!IS_ERR(gc2145->pwdn_gpio)) {
-		gpiod_set_value_cansleep(gc2145->pwdn_gpio, 0);
-		usleep_range(2000, 5000);
-	}
-
-	if (gc2145->bus_cfg.bus_type == V4L2_MBUS_CSI2)
-		ret = gc2145_write_array(client, gc2145_mipi_init_regs);
-	else
-		ret = gc2145_write_array(client, gc2145_dvp_init_regs);
-	if (ret)
-		goto unlock;
 
 	ret = gc2145_write_array(client, gc2145->frame_size->regs);
 	if (ret)
@@ -2225,13 +2221,18 @@ static int gc2145_s_frame_interval(struct v4l2_subdev *sd,
 		 fi->interval.numerator, fi->interval.denominator);
 
 	mutex_lock(&gc2145->lock);
+
 	if (gc2145->format.width == 1600)
 		goto unlock;
+
 	fps = DIV_ROUND_CLOSEST(fi->interval.denominator,
 				fi->interval.numerator);
 	mf = gc2145->format;
 	__gc2145_try_frame_size_fps(gc2145, &mf, &size, fps);
+
 	if (gc2145->frame_size != size) {
+		dev_info(&client->dev, "%s match wxh@FPS is %dx%d@%d\n",
+			   __func__, size->width, size->height, size->fps);
 		ret = gc2145_write_array(client, size->regs);
 		if (ret)
 			goto unlock;
@@ -2244,10 +2245,129 @@ unlock:
 	return ret;
 }
 
+static void gc2145_get_module_inf(struct gc2145 *gc2145,
+				  struct rkmodule_inf *inf)
+{
+	memset(inf, 0, sizeof(*inf));
+	strlcpy(inf->base.sensor, DRIVER_NAME, sizeof(inf->base.sensor));
+	strlcpy(inf->base.module, gc2145->module_name,
+		sizeof(inf->base.module));
+	strlcpy(inf->base.lens, gc2145->len_name, sizeof(inf->base.lens));
+}
+
+static long gc2145_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
+{
+	struct gc2145 *gc2145 = to_gc2145(sd);
+	long ret = 0;
+
+	switch (cmd) {
+	case RKMODULE_GET_MODULE_INFO:
+		gc2145_get_module_inf(gc2145, (struct rkmodule_inf *)arg);
+		break;
+	default:
+		ret = -ENOIOCTLCMD;
+		break;
+	}
+
+	return ret;
+}
+
+#ifdef CONFIG_COMPAT
+static long gc2145_compat_ioctl32(struct v4l2_subdev *sd,
+				  unsigned int cmd, unsigned long arg)
+{
+	void __user *up = compat_ptr(arg);
+	struct rkmodule_inf *inf;
+	struct rkmodule_awb_cfg *cfg;
+	long ret;
+
+	switch (cmd) {
+	case RKMODULE_GET_MODULE_INFO:
+		inf = kzalloc(sizeof(*inf), GFP_KERNEL);
+		if (!inf) {
+			ret = -ENOMEM;
+			return ret;
+		}
+
+		ret = gc2145_ioctl(sd, cmd, inf);
+		if (!ret)
+			ret = copy_to_user(up, inf, sizeof(*inf));
+		kfree(inf);
+		break;
+	case RKMODULE_AWB_CFG:
+		cfg = kzalloc(sizeof(*cfg), GFP_KERNEL);
+		if (!cfg) {
+			ret = -ENOMEM;
+			return ret;
+		}
+
+		ret = copy_from_user(cfg, up, sizeof(*cfg));
+		if (!ret)
+			ret = gc2145_ioctl(sd, cmd, cfg);
+		kfree(cfg);
+		break;
+	default:
+		ret = -ENOIOCTLCMD;
+		break;
+	}
+
+	return ret;
+}
+#endif
+
+static int gc2145_init(struct v4l2_subdev *sd, u32 val)
+{
+	int ret;
+	struct gc2145 *gc2145 = to_gc2145(sd);
+	struct i2c_client *client = gc2145->client;
+
+	dev_info(&client->dev, "%s(%d)\n", __func__, __LINE__);
+
+	/* soft reset */
+	ret = gc2145_write(client, 0xfe, 0xf0);
+	if (gc2145->bus_cfg.bus_type == V4L2_MBUS_CSI2)
+		ret = gc2145_write_array(client, gc2145_mipi_init_regs);
+	else
+		ret = gc2145_write_array(client, gc2145_dvp_init_regs);
+
+	return ret;
+}
+
+static int gc2145_power(struct v4l2_subdev *sd, int on)
+{
+	int ret;
+	struct gc2145 *gc2145 = to_gc2145(sd);
+	struct i2c_client *client = gc2145->client;
+	struct device *dev = &gc2145->client->dev;
+
+	dev_info(&client->dev, "%s(%d) on(%d)\n", __func__, __LINE__, on);
+	if (on) {
+		if (!IS_ERR(gc2145->pwdn_gpio)) {
+			gpiod_set_value_cansleep(gc2145->pwdn_gpio, 0);
+			usleep_range(2000, 5000);
+		}
+		ret = gc2145_init(sd, 0);
+		usleep_range(10000, 20000);
+		if (ret)
+			dev_err(dev, "init error\n");
+	} else {
+		if (!IS_ERR(gc2145->pwdn_gpio)) {
+			gpiod_set_value_cansleep(gc2145->pwdn_gpio, 1);
+			usleep_range(2000, 5000);
+		}
+	}
+	return 0;
+}
+
 static const struct v4l2_subdev_core_ops gc2145_subdev_core_ops = {
 	.log_status = v4l2_ctrl_subdev_log_status,
 	.subscribe_event = v4l2_ctrl_subdev_subscribe_event,
 	.unsubscribe_event = v4l2_event_subdev_unsubscribe,
+	.ioctl = gc2145_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl32 = gc2145_compat_ioctl32,
+#endif
+	.s_power = gc2145_power,
 };
 
 static const struct v4l2_subdev_video_ops gc2145_subdev_video_ops = {
@@ -2313,6 +2433,7 @@ static int __gc2145_power_on(struct gc2145 *gc2145)
 	int ret;
 	struct device *dev = &gc2145->client->dev;
 
+	dev_info(dev, "%s(%d)\n", __func__, __LINE__);
 	if (!IS_ERR(gc2145->reset_gpio)) {
 		gpiod_set_value_cansleep(gc2145->reset_gpio, 0);
 		usleep_range(2000, 5000);
@@ -2357,6 +2478,7 @@ static int __gc2145_power_on(struct gc2145 *gc2145)
 
 static void __gc2145_power_off(struct gc2145 *gc2145)
 {
+	dev_info(&gc2145->client->dev, "%s(%d)\n", __func__, __LINE__);
 	if (!IS_ERR(gc2145->xvclk))
 		clk_disable_unprepare(gc2145->xvclk);
 	if (!IS_ERR(gc2145->supplies))
@@ -2423,13 +2545,34 @@ static int gc2145_parse_of(struct gc2145 *gc2145)
 static int gc2145_probe(struct i2c_client *client,
 			const struct i2c_device_id *id)
 {
+	struct device *dev = &client->dev;
+	struct device_node *node = dev->of_node;
 	struct v4l2_subdev *sd;
 	struct gc2145 *gc2145;
+	char facing[2];
 	int ret;
+
+	dev_info(dev, "driver version: %02x.%02x.%02x",
+		DRIVER_VERSION >> 16,
+		(DRIVER_VERSION & 0xff00) >> 8,
+		DRIVER_VERSION & 0x00ff);
 
 	gc2145 = devm_kzalloc(&client->dev, sizeof(*gc2145), GFP_KERNEL);
 	if (!gc2145)
 		return -ENOMEM;
+
+	ret = of_property_read_u32(node, RKMODULE_CAMERA_MODULE_INDEX,
+				   &gc2145->module_index);
+	ret |= of_property_read_string(node, RKMODULE_CAMERA_MODULE_FACING,
+				       &gc2145->module_facing);
+	ret |= of_property_read_string(node, RKMODULE_CAMERA_MODULE_NAME,
+				       &gc2145->module_name);
+	ret |= of_property_read_string(node, RKMODULE_CAMERA_LENS_NAME,
+				       &gc2145->len_name);
+	if (ret) {
+		dev_err(dev, "could not get module information!\n");
+		return -EINVAL;
+	}
 
 	gc2145->client = client;
 	gc2145->xvclk = devm_clk_get(&client->dev, "xvclk");
@@ -2500,7 +2643,16 @@ static int gc2145_probe(struct i2c_client *client,
 	if (ret < 0)
 		goto error;
 
-	ret = v4l2_async_register_subdev(&gc2145->sd);
+	memset(facing, 0, sizeof(facing));
+	if (strcmp(gc2145->module_facing, "back") == 0)
+		facing[0] = 'b';
+	else
+		facing[0] = 'f';
+
+	snprintf(sd->name, sizeof(sd->name), "m%02d_%s_%s %s",
+		 gc2145->module_index, facing,
+		 DRIVER_NAME, dev_name(sd->dev));
+	ret = v4l2_async_register_subdev_sensor_common(sd);
 	if (ret)
 		goto error;
 

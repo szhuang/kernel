@@ -252,6 +252,10 @@
 		"Headphone", "Headphone Jack";
 		simple-audio-card,routing ="MIC1", "Microphone Jack",
 		"MIC2", "Microphone Jack",
+<<<<<<< HEAD
+=======
+		"Microphone Jack", "micbias1",
+>>>>>>> Nscreen
 		"Headphone Jack", "HPOL",
 		"Headphone Jack", "HPOR";
 
@@ -285,7 +289,11 @@
 		status = "okay";
 		compatible = "rockchip,rk3288-hdmi-analog",
 		"rockchip,rk3368-hdmi-analog";
+<<<<<<< HEAD
 		rockchip,model = "rockchip,es8316-codec";
+=======
+		//rockchip,model = "rockchip,es8316-codec";
+>>>>>>> Nscreen
 		rockchip,cpu = <&i2s>;
 		rockchip,codec = <&es8316>, <&hdmi>;
 		rockchip,widgets =
@@ -294,6 +302,10 @@
 		rockchip,routing =
 		"MIC1", "Microphone Jack",
 		"MIC2", "Microphone Jack",
+<<<<<<< HEAD
+=======
+		"Microphone Jack", "micbias1",
+>>>>>>> Nscreen
 		"Headphone Jack", "HPOL",
 		"Headphone Jack", "HPOR";
 	};
@@ -337,7 +349,11 @@
 		enable-gpios = <&gpio7 1 GPIO_ACTIVE_HIGH>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&bl_en>;
+<<<<<<< HEAD
 		pwms = <&pwm0 0 1000000 0>;
+=======
+		pwms = <&pwm0 0 50000 0>;
+>>>>>>> Nscreen
 	};
 
 	xin32k:xin32k {
@@ -571,7 +587,11 @@
 			regulator-off-in-suspend;
 		};
 	};
+<<<<<<< HEAD
 
+=======
+	
+>>>>>>> Nscreen
 	rk818:pmic@1c {
 		compatible = "rockchip,rk818";
 		reg = <0x1c>;
@@ -617,7 +637,11 @@
 				regulator-boot-on;
 				regulator-min-microvolt = <800000>;
 				regulator-max-microvolt = <1250000>;
+<<<<<<< HEAD
 				regulator-ramp-delay = <6001>;
+=======
+				regulator-ramp-delay = <6000>;
+>>>>>>> Nscreen
 				regulator-state-mem {
 					regulator-on-in-suspend;
 					regulator-suspend-microvolt = <1000000>;
@@ -640,7 +664,11 @@
 				regulator-max-microvolt = <3300000>;
 				regulator-name = "vcc_io";
 				regulator-state-mem {
+<<<<<<< HEAD
 					regulator-off-in-suspend;
+=======
+					regulator-on-in-suspend;
+>>>>>>> Nscreen
 				};
 			};
 
@@ -787,6 +815,7 @@
 			//pinctrl-names = "default";
 			//pinctrl-0 = <&dc_irq_gpio>;
 			ocv_table = <
+<<<<<<< HEAD
 			2750 2950 3150 3350 3550 3750 3780
 			3810 3840 3870 3900 3950 4000 4010
 			4030 4050 4070 4090 4110 4230 4250>;
@@ -800,6 +829,21 @@
 			sleep_exit_current = <300>;
 			//sleep_filter_current = <100>;
 			power_off_thresd = <2800>;
+=======
+				3400 3660 3683 3708 3733 3750 3770
+				3785 3800 3819 3841 3870 3918 3963
+				4005 4055 4102 4155 4209 4264 4321>;
+			design_capacity = <4730>;
+			design_qmax = <5203>;
+			bat_res = <100>;
+			max_input_current = <2000>;
+			max_chrg_current = <1200>;
+			max_chrg_voltage = <4350>;
+			sleep_enter_current = <300>;
+			sleep_exit_current = <300>;
+			sleep_filter_current = <100>;
+			power_off_thresd = <3400>;
+>>>>>>> Nscreen
 			zero_algorithm_vol = <3950>;
 			fb_temperature = <105>;
 			sample_res = <10>;
@@ -819,7 +863,10 @@
 &sdio0 {
 	status = "okay";
 	max-frequency = <150000000>;
+<<<<<<< HEAD
 
+=======
+>>>>>>> Nscreen
 	bus-width = <4>;
 	cap-sd-highspeed;
 	cap-sdio-irq;
@@ -883,9 +930,13 @@
 };
 
 //&tsadc {
+<<<<<<< HEAD
 	//rockchip,hw-tshut-mode = <1>; /* tshut mode 0:CRU 1:GPIO */
 	//rockchip,hw-tshut-polarity = <0>; /* tshut polarity 0:LOW 1:HIGH */
 	//pinctrl-1 = <&otp_out>;
+=======
+	//rockchip,hw-tshut-polarity = <1>; /* tshut polarity 0:LOW 1:HIGH */
+>>>>>>> Nscreen
 	//status = "okay";
 //};
 
@@ -995,7 +1046,11 @@
 		compatible = "everest,es8316";
 		reg = <0x10>;
 		spk-con-gpio = <&gpio7 15 GPIO_ACTIVE_HIGH>;
+<<<<<<< HEAD
 		//hp-det-gpio = <&gpio7 7 GPIO_ACTIVE_HIGH>;
+=======
+		hp-det-gpio = <&gpio7 7 GPIO_ACTIVE_HIGH>;
+>>>>>>> Nscreen
 		clock-names = "mclk";
 		clocks = <&cru SCLK_I2S0_OUT>;
 		pinctrl-names = "default";
@@ -1013,16 +1068,27 @@
 		reg = <0x36>; //6c , 36 ,6a,1B,4a,6f
 		clocks = <&cru SCLK_VIP_OUT>;
 		clock-names="xvclk";
+<<<<<<< HEAD
 		//pinctrl-name="default";
 		//pinctrl-0 = <&cam_pd>;
+=======
+>>>>>>> Nscreen
 		dovdd-supply = <&dovdd_1v8>;
 		avdd-supply = <&avdd_2v8>;
 		dvdd-supply = <&dvdd_1v5>;
 		dvp-supply = <&vcc18_dvp>;
+<<<<<<< HEAD
 		//dvp-supply = <&vcc28_dvp>;
 		//avdd-supply = <&vcc28_cam>;
 		//dvdd-supply = <&vcc15_cam>;
 		//dovdd-supply = <&vcc18_cam>;
+=======
+		rockchip,camera-module-index = <0>;
+		rockchip,camera-module-facing = "back";
+		rockchip,camera-module-name = "CameraKing";
+		rockchip,camera-module-lens-name = "CHT-842B-MD";
+		power-gpios = <&gpio0 17 GPIO_ACTIVE_HIGH>;
+>>>>>>> Nscreen
 		pwdn-gpios = <&gpio2 15 GPIO_ACTIVE_HIGH>;
 		port {
 			ov5648_out:endpoint {
@@ -1113,9 +1179,23 @@
 	status = "okay";
 };
 
+<<<<<<< HEAD
 //&cif_isp0 {
 //	status = "okay";
 //};
+=======
+&pwm1 {
+	status = "okay";
+};
+
+&spi2{
+	status = "okay";
+};
+
+&cif_isp0 {
+	status = "disabled";
+};
+>>>>>>> Nscreen
 
 &pinctrl {
 	backlight {

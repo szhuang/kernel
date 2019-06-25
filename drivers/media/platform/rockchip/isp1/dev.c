@@ -77,6 +77,9 @@ static char rkisp1_version[RKISP_VERNO_LEN];
 module_param_string(version, rkisp1_version, RKISP_VERNO_LEN, 0444);
 MODULE_PARM_DESC(version, "version number");
 
+static DEFINE_MUTEX(rkisp1_dev_mutex);
+static LIST_HEAD(rkisp1_device_list);
+
 /**************************** pipeline operations *****************************/
 
 static int __isp_pipeline_prepare(struct rkisp1_pipeline *p,
@@ -339,13 +342,16 @@ static int rkisp1_create_links(struct rkisp1_device *dev)
 		return ret;
 
 	/* create isp internal links */
-	/* SP links */
-	source = &dev->isp_sdev.sd.entity;
-	sink = &dev->stream[RKISP1_STREAM_SP].vnode.vdev.entity;
-	ret = media_entity_create_link(source, RKISP1_ISP_PAD_SOURCE_PATH,
-				       sink, 0, flags);
-	if (ret < 0)
-		return ret;
+	if (dev->isp_ver != ISP_V10_1) {
+		/* SP links */
+		source = &dev->isp_sdev.sd.entity;
+		sink = &dev->stream[RKISP1_STREAM_SP].vnode.vdev.entity;
+		ret = media_entity_create_link(source,
+					       RKISP1_ISP_PAD_SOURCE_PATH,
+					       sink, 0, flags);
+		if (ret < 0)
+			return ret;
+	}
 
 	/* MP links */
 	source = &dev->isp_sdev.sd.entity;
@@ -355,8 +361,12 @@ static int rkisp1_create_links(struct rkisp1_device *dev)
 	if (ret < 0)
 		return ret;
 
+#if RKISP1_RK3326_USE_OLDMIPI
+	if (dev->isp_ver == ISP_V13) {
+#else
 	if (dev->isp_ver == ISP_V12 ||
 		dev->isp_ver == ISP_V13) {
+#endif
 		/* MIPI RAW links */
 		source = &dev->isp_sdev.sd.entity;
 		sink = &dev->stream[RKISP1_STREAM_RAW].vnode.vdev.entity;
@@ -382,6 +392,7 @@ static int _set_pipeline_default_fmt(struct rkisp1_device *dev)
 	struct v4l2_subdev_selection sel;
 	struct v4l2_subdev_pad_config cfg;
 	u32 width, height;
+	u32 ori_width, ori_height, ori_code;
 
 	if (dev->num_sensors) {
 		sensor = dev->sensors[0].sd;
@@ -397,6 +408,10 @@ static int _set_pipeline_default_fmt(struct rkisp1_device *dev)
 
 			return -ENXIO;
 		}
+
+		ori_width = fmt.format.width;
+		ori_height = fmt.format.height;
+		ori_code = fmt.format.code;
 
 		if (dev->isp_ver == ISP_V12) {
 			fmt.format.width  = clamp_t(u32, fmt.format.width,
@@ -451,8 +466,14 @@ static int _set_pipeline_default_fmt(struct rkisp1_device *dev)
 		/* change fmt&size of MP/SP */
 		rkisp1_set_stream_def_fmt(dev, RKISP1_STREAM_MP,
 					  width, height, V4L2_PIX_FMT_YUYV);
-		rkisp1_set_stream_def_fmt(dev, RKISP1_STREAM_SP,
-					  width, height, V4L2_PIX_FMT_YUYV);
+		if (dev->isp_ver != ISP_V10_1)
+			rkisp1_set_stream_def_fmt(dev, RKISP1_STREAM_SP,
+						  width, height, V4L2_PIX_FMT_YUYV);
+		if (dev->isp_ver == ISP_V12 ||
+			dev->isp_ver == ISP_V13)
+			rkisp1_set_stream_def_fmt(dev, RKISP1_STREAM_RAW,
+						  ori_width, ori_height,
+						  rkisp1_mbus_pixelcode_to_v4l2(ori_code));
 	}
 
 	return 0;
@@ -658,8 +679,12 @@ static irqreturn_t rkisp1_mipi_irq_hdl(int irq, void *ctx)
 	unsigned int mis_val;
 	unsigned int err1, err2, err3;
 
+#if RKISP1_RK3326_USE_OLDMIPI
+	if (rkisp1_dev->isp_ver == ISP_V13) {
+#else
 	if (rkisp1_dev->isp_ver == ISP_V13 ||
 		rkisp1_dev->isp_ver == ISP_V12) {
+#endif
 		err1 = readl(rkisp1_dev->base_addr + CIF_ISP_CSI0_ERR1);
 		err2 = readl(rkisp1_dev->base_addr + CIF_ISP_CSI0_ERR2);
 		err3 = readl(rkisp1_dev->base_addr + CIF_ISP_CSI0_ERR3);
@@ -672,6 +697,20 @@ static irqreturn_t rkisp1_mipi_irq_hdl(int irq, void *ctx)
 		mis_val = readl(rkisp1_dev->base_addr + CIF_MIPI_MIS);
 		if (mis_val)
 			rkisp1_mipi_isr(mis_val, rkisp1_dev);
+
+		/*
+		 * As default interrupt mask for csi_rx are on,
+		 * when resetting isp, interrupt from csi_rx maybe arise,
+		 * we should clear them.
+		 */
+#if RKISP1_RK3326_USE_OLDMIPI
+		if (rkisp1_dev->isp_ver == ISP_V12) {
+			/* read error state register to clear interrupt state */
+			readl(rkisp1_dev->base_addr + CIF_ISP_CSI0_ERR1);
+			readl(rkisp1_dev->base_addr + CIF_ISP_CSI0_ERR2);
+			readl(rkisp1_dev->base_addr + CIF_ISP_CSI0_ERR3);
+		}
+#endif
 	}
 
 	return IRQ_HANDLED;
@@ -722,7 +761,7 @@ static const unsigned int rk1808_isp_clk_rate[] = {
 
 /* isp clock adjustment table (MHz) */
 static const unsigned int rk3288_isp_clk_rate[] = {
-	384, 500, 594
+	150, 384, 500, 594
 };
 
 /* isp clock adjustment table (MHz) */
@@ -797,7 +836,7 @@ static const struct isp_match_data rk3326_isp_match_data = {
 static const struct isp_match_data rk3368_isp_match_data = {
 	.clks = rk3368_isp_clks,
 	.num_clks = ARRAY_SIZE(rk3368_isp_clks),
-	.isp_ver = ISP_V10,
+	.isp_ver = ISP_V10_1,
 	.clk_rate_tbl = rk3368_isp_clk_rate,
 	.num_clk_rate_tbl = ARRAY_SIZE(rk3368_isp_clk_rate),
 	.irqs = rk3368_isp_irqs,
@@ -1083,6 +1122,16 @@ static int rkisp1_plat_probe(struct platform_device *pdev)
 	if (ret)
 		goto err_runtime_disable;
 
+	if (isp_dev->isp_ver == ISP_V12 || isp_dev->isp_ver == ISP_V13) {
+		writel(0, isp_dev->base_addr + CIF_ISP_CSI0_CTRL0);
+		writel(0, isp_dev->base_addr + CIF_ISP_CSI0_MASK1);
+		writel(0, isp_dev->base_addr + CIF_ISP_CSI0_MASK2);
+		writel(0, isp_dev->base_addr + CIF_ISP_CSI0_MASK3);
+	}
+
+	mutex_lock(&rkisp1_dev_mutex);
+	list_add_tail(&isp_dev->list, &rkisp1_device_list);
+	mutex_unlock(&rkisp1_dev_mutex);
 	return 0;
 
 err_runtime_disable:
@@ -1134,6 +1183,19 @@ static int __maybe_unused rkisp1_runtime_resume(struct device *dev)
 
 	return 0;
 }
+
+static int __init rkisp1_clr_unready_dev(void)
+{
+	struct rkisp1_device *isp_dev;
+
+	mutex_lock(&rkisp1_dev_mutex);
+	list_for_each_entry(isp_dev, &rkisp1_device_list, list)
+		v4l2_async_notifier_clr_unready_dev(&isp_dev->notifier);
+	mutex_unlock(&rkisp1_dev_mutex);
+
+	return 0;
+}
+late_initcall_sync(rkisp1_clr_unready_dev);
 
 static const struct dev_pm_ops rkisp1_plat_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,

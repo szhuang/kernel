@@ -501,6 +501,22 @@ config VIDEO_IMX219
 	---help---
 	  This driver supports IMX219 cameras from Sony
 
+config VIDEO_IMX258
+        tristate "Sony imx258 sensor support"
+        depends on VIDEO_V4L2 && I2C
+        depends on MEDIA_CAMERA_SUPPORT
+        select V4L2_FWNODE
+        help
+          This driver supports IMX258 cameras from Sony
+
+config VIDEO_IMX317
+	tristate "Sony imx317 sensor support"
+	depends on VIDEO_V4L2 && I2C
+	depends on MEDIA_CAMERA_SUPPORT
+	select V4L2_FWNODE
+	help
+	  This driver supports IMX317 cameras from Sony
+
 config VIDEO_IMX323
 	tristate "Sony imx323 sensor support"
 	depends on VIDEO_V4L2 && I2C
@@ -508,6 +524,14 @@ config VIDEO_IMX323
 	select V4L2_FWNODE
 	help
 	  This driver supports IMX323 cameras from Sony
+
+config VIDEO_IMX327
+	tristate "Sony imx327 sensor support"
+	depends on VIDEO_V4L2 && I2C
+	depends on MEDIA_CAMERA_SUPPORT
+	select V4L2_FWNODE
+	help
+	  This driver supports IMX327 cameras from Sony
 
 config VIDEO_VIRT_CAMERA
 	tristate "Rockchip virtual sensor support"
@@ -591,6 +615,7 @@ config VIDEO_OV5647
 
 config VIDEO_OV5648
 	tristate "OmniVision OV5648 sensor support"
+<<<<<<< HEAD
 	depends on I2C && VIDEO_V4L2
 	depends on MEDIA_CAMERA_SUPPORT
 	---help---
@@ -600,6 +625,18 @@ config VIDEO_OV5648
 	  To compile this driver as a module, choose M here: the
 	  module will be called ov5648.	  
 	  
+=======
+	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	depends on MEDIA_CAMERA_SUPPORT
+	select V4L2_FWNODE
+	help
+	  This is a Video4Linux2 sensor-level driver for the OmniVision
+	  OV5648 camera.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ov5648.
+
+>>>>>>> Nscreen
 config VIDEO_OV5695
 	tristate "OmniVision OV5695 sensor support"
 	depends on I2C && VIDEO_V4L2
@@ -663,6 +700,17 @@ config VIDEO_OV7750
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called ov7750.
+
+config VIDEO_OV8858
+	tristate "OmniVision OV8858 sensor support"
+	depends on I2C && VIDEO_V4L2
+	depends on MEDIA_CAMERA_SUPPORT
+	help
+	  This is a Video4Linux2 sensor-level driver for the OmniVision
+	  OV8858 camera.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ov8858.
 
 config VIDEO_OV9650
 	tristate "OmniVision OV9650/OV9652 sensor support"
@@ -834,6 +882,39 @@ config VIDEO_GC2355
 	  To compile this driver as a module, choose M here: the
 	  module will be called gc2355.
 
+config VIDEO_GC2385
+	tristate "GalaxyCore GC2385 sensor support"
+	depends on VIDEO_V4L2 && I2C && MEDIA_CONTROLLER
+	depends on MEDIA_CAMERA_SUPPORT
+	select V4L2_FWNODE
+	help
+	  Support for the GalaxyCore GC2385 sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called gc2385.
+
+config VIDEO_GC5025
+	tristate "GalaxyCore GC5025 sensor support"
+	depends on VIDEO_V4L2 && I2C && MEDIA_CONTROLLER
+	depends on MEDIA_CAMERA_SUPPORT
+	select V4L2_FWNODE
+	help
+	  Support for the GalaxyCore GC5025 sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called gc5025.
+
+config VIDEO_GC8034
+	tristate "GalaxyCore GC8034 sensor support"
+	depends on VIDEO_V4L2 && I2C && MEDIA_CONTROLLER
+	depends on MEDIA_CAMERA_SUPPORT
+	select V4L2_FWNODE
+	help
+	  Support for the GalaxyCore GC8034 sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called gc8034.
+
 config VIDEO_SC031GS
 	tristate "GalaxyCore SC031GS sensor support"
 	depends on VIDEO_V4L2 && I2C && VIDEO_V4L2_SUBDEV_API
@@ -861,6 +942,24 @@ config VIDEO_GC2035
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called gc2035.
+
+config VIDEO_JX_H65
+	tristate "SOI JX_H65 sensor support"
+	depends on VIDEO_V4L2 && I2C && VIDEO_V4L2_SUBDEV_API
+	help
+	  Support for the SOI JX_H65 sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called jx_h65.
+
+config VIDEO_PREISP_DUMMY_SENSOR
+	tristate "Preisp dummy sensor support"
+	depends on VIDEO_V4L2 && I2C && VIDEO_V4L2_SUBDEV_API
+	help
+	  Support for the preisp dummy sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called pisp_dmy.
 
 comment "Flash devices"
 
