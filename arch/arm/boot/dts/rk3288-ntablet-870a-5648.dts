@@ -242,12 +242,12 @@
 	};
 
 	sound:sound {
-		status = "okay";
+		status = "disabled";
 		compatible = "simple-audio-card";
 		simple-audio-card,format = "i2s";
 		simple-audio-card,name = "rockchip,es8316-codec";
 		//simple-audio-card,name = "rockchip,rk3288-evb-codec";
-		simple-audio-card,mclk-fs = <512>;
+		simple-audio-card,mclk-fs = <256>;  //was 512
 		simple-audio-card,widgets ="Microphone", "Microphone Jack",
 		"Headphone", "Headphone Jack";
 		simple-audio-card,routing ="MIC1", "Microphone Jack",
