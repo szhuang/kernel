@@ -25,18 +25,19 @@
 
 
 
-struct iio_channel *chan;
+struct iio_channel *chan; //定义 IIO 通道结构体；
 
 static int adc_show(struct seq_file *m, void *v)
 {
     int value,Vresult;
-//	while(1)
-//	{
-		iio_read_channel_raw(chan, &value);
+		iio_read_channel_raw(chan, &value);//读取 AD 采集到的原始数据,原始数据并存入value中；
+	/*转换数据,计算公式:Vresult = (Vref * value) / (2^n-1)
+		========> 用户需要的电压 = (rk3288标准电压 * 采集的原始数据) / (2^AD位数-1)；
+		现采用AD 10位精度采集；
+	*/
 		Vresult = (1800 * value) / 1023;
 		printk("adc_in0:%d mv\n",Vresult);
-//		msleep(1000);
-//	}
+		seq_printf(m, "%d\n",Vresult);
 
     	return 0;
 }
@@ -55,13 +56,9 @@ static struct file_operations adc_fops = {
 };
 
 static int adc_probe(struct platform_device *pdev){
-	struct proc_dir_entry *file;
-	chan= iio_channel_get(&pdev->dev,NULL);
-
-	file = proc_create("gpio_adc0", 0666, NULL, &adc_fops);
-    	if(!file)
-        	return -ENOMEM;
-
+	chan= iio_channel_get(&pdev->dev,NULL); 	//获取 IIO 通道结构体；
+	if(!proc_create("gpio_adc0", 0666, NULL, &adc_fops))
+		return -ENOMEM;
 	return 0;
 }
 
@@ -72,7 +69,7 @@ static int adc_remove(struct platform_device *pdev){
 }
 
 static const struct of_device_id adc_of_match[]={
-	{.compatible = "gpio_adc0",.data = NULL},
+	{.compatible = "gpio_adc0"},
 	{},
 };
 
