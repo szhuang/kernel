@@ -1,3 +1,6 @@
+/*
+please read the data from /proc/gpio_adc0
+*/
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/init.h>
@@ -31,10 +34,11 @@ static int adc_show(struct seq_file *m, void *v)
 {
     int value,Vresult;
 		iio_read_channel_raw(chan, &value);//读取 AD 采集到的原始数据,原始数据并存入value中；
-	/*转换数据,计算公式:Vresult = (Vref * value) / (2^n-1)
-		========> 用户需要的电压 = (rk3288标准电压 * 采集的原始数据) / (2^AD位数-1)；
-		现采用AD 10位精度采集；
-	*/
+		/*
+		    转换数据,计算公式:Vresult = (Vref * value) / (2^n-1)
+			========> 用户需要的电压 = (rk3288标准电压 * 采集的原始数据) / (2^AD位数-1)；
+			现采用AD 10位精度采集；
+		*/
 		Vresult = (1800 * value) / 1023;
 		printk("adc_in0:%d mv\n",Vresult);
 		seq_printf(m, "%d\n",Vresult);
@@ -87,7 +91,7 @@ static struct platform_driver adc_driver = {
 
 
 static int __init adc_init(void){
-	printk("gpio_adc0 init\n");
+	printk("gpio_adc0 init, please read the data from /proc/gpio_adc0 \n");
 	return platform_driver_register(&adc_driver);
 }
 
