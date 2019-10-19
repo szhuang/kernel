@@ -62,7 +62,7 @@
 		device_type = "memory";
 		reg = <0x0 0x0 0x0 0x80000000>;
 	};
-	
+
 	reserved-memory {
 		ramoops_mem:ramoops@00000000 {
 			reg = <0x0 0x8000000 0x0 0xF0000>;
@@ -82,7 +82,7 @@
 	fiq-debugger{
 		rockchip,irq-mode-enable = <1>;  /* If enable uart uses irq instead of fiq */
 	};
-	
+
 	display-subsystem {
 		status = "okay";
         ports = <&vopb_out>, <&vopl_out>;
@@ -111,7 +111,7 @@
 					logo,mode = "center";
 					charge_logo,mode = "center";
 					connect = <&vopl_out_dsi0>;
-			};			
+			};
 			route_lvds:route-lvds {
 					status = "disabled";
 					logo,uboot = "logo.bmp";
@@ -448,6 +448,11 @@
 		io-channels = <&saradc 2>;
 	};
 
+	adc0{
+        compatible = "gpio_adc0";
+        io-channels=<&saradc 0>;
+    };
+
 	uboot-charge {
 		compatible = "rockchip,uboot-charge";
 		rockchip,uboot-charge-on = <0>;
@@ -573,7 +578,7 @@
 			regulator-off-in-suspend;
 		};
 	};
-	
+
 	rk818:pmic@1c {
 		compatible = "rockchip,rk818";
 		reg = <0x1c>;

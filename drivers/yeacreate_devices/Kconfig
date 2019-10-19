@@ -1,0 +1,9 @@
+menu "YeaCreate devices support"
+
+config YEACREATE_GPIO_ADC0
+	tristate "Ntablet GPIO board adc_in0 support"
+	---help---
+		Ntablet GPIO board support:
+		    support adc_in0 for the GPIO board of Ntablet.
+
+endmenu
