@@ -73,7 +73,7 @@ static int adc_remove(struct platform_device *pdev){
 }
 
 static const struct of_device_id adc_of_match[]={
-	{.compatible = "gpio_adc0"},
+	{.compatible = "yeacreate_devices,gpio_adc0"},
 	{},
 };
 

@@ -336,7 +336,7 @@
 		240 241 242 243 244 245 246 247
 		248 249 250 251 252 253 254 255>;
 		default-brightness-level = <128>;
-		enable-gpios = <&gpio7 1 GPIO_ACTIVE_HIGH>;
+		enable-gpios = <&gpio7 0 GPIO_ACTIVE_HIGH>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&bl_en>;
 		pwms = <&pwm0 0 50000 0>;
@@ -449,7 +449,7 @@
 	};
 
 	adc0{
-        compatible = "gpio_adc0";
+        compatible = "yeacreate_devices,gpio_adc0";
         io-channels=<&saradc 0>;
     };
 
@@ -1122,6 +1122,23 @@
 
 &spi2{
 	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&spi2_clk &spi2_tx &spi2_rx &spi2_cs0 &spi2_cs1>;
+	#address-cells = <1>;
+
+	spidev@0 {
+		compatible = "rockchip,spidev";
+		reg = <0>;
+		spi-max-frequency = <50000000>;
+		spi-cpha = <1>;
+	};
+
+	spidev@1 {
+		compatible = "rockchip,spidev";
+		reg = <1>;
+		spi-max-frequency = <50000000>;
+		spi-cpha = <1>;
+	};
 };
 
 &cif_isp0 {
