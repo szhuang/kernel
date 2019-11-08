@@ -451,6 +451,7 @@
 	adc0{
         compatible = "yeacreate_devices,gpio_adc0";
         io-channels=<&saradc 0>;
+        status = "okay";
     };
 
 	uboot-charge {
@@ -843,6 +844,10 @@
 &uart0 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&uart0_xfer &uart0_cts>;
+	status = "okay";
+};
+
+&uart1 {
 	status = "okay";
 };
 
