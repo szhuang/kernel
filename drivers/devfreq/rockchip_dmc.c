@@ -25,7 +25,6 @@
 #include <linux/devfreq.h>
 #include <linux/devfreq_cooling.h>
 #include <linux/devfreq-event.h>
-#include <linux/fb.h>
 #include <linux/input.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
@@ -36,7 +35,6 @@
 #include <linux/platform_device.h>
 #include <linux/pm_opp.h>
 #include <linux/pm_qos.h>
-#include <linux/reboot.h>
 #include <linux/regmap.h>
 #include <linux/regulator/consumer.h>
 #include <linux/rockchip/rockchip_sip.h>
@@ -50,6 +48,7 @@
 #include <soc/rockchip/rkfb_dmc.h>
 #include <soc/rockchip/rockchip_dmc.h>
 #include <soc/rockchip/rockchip_sip.h>
+#include <soc/rockchip/rockchip_system_monitor.h>
 #include <soc/rockchip/rockchip-system-status.h>
 #include <soc/rockchip/rockchip_opp_select.h>
 #include <soc/rockchip/scpi.h>
@@ -588,7 +587,8 @@ static const char * const rk3128_dts_timing[] = {
 	"lpddr2_drv",
 	"phy_lpddr2_clk_drv",
 	"phy_lpddr2_cmd_drv",
-	"phy_lpddr2_dqs_drv"
+	"phy_lpddr2_dqs_drv",
+	"ddr_2t",
 };
 
 struct rk3128_ddr_dts_config_timing {
@@ -612,6 +612,7 @@ struct rk3128_ddr_dts_config_timing {
 	u32 phy_lpddr2_clk_drv;
 	u32 phy_lpddr2_cmd_drv;
 	u32 phy_lpddr2_dqs_drv;
+	u32 ddr_2t;
 	u32 available;
 };
 
@@ -1072,6 +1073,7 @@ struct rk3368_dram_timing {
 	u32 phy_cmd_drv;
 	u32 phy_dqs_drv;
 	u32 phy_odt;
+	u32 ddr_2t;
 };
 
 struct rk3399_dram_timing {
@@ -1116,13 +1118,11 @@ struct rockchip_dmcfreq {
 	struct dram_timing *timing;
 	struct regulator *vdd_center;
 	struct notifier_block status_nb;
-	struct notifier_block reboot_nb;
-	struct notifier_block fb_nb;
 	struct list_head video_info_list;
 	struct freq_map_table *vop_bw_tbl;
 	struct work_struct boost_work;
 	struct input_handler input_handler;
-	struct thermal_opp_info *opp_info;
+	struct monitor_dev_info *mdev_info;
 	struct rl_map_table *vop_pn_rl_tbl;
 	struct delayed_work msch_rl_work;
 
@@ -1169,12 +1169,6 @@ struct rockchip_dmcfreq {
 
 	int (*set_auto_self_refresh)(u32 en);
 	int (*set_msch_readlatency)(unsigned int rl);
-};
-
-static struct thermal_opp_device_data dmc_devdata = {
-	.type = THERMAL_OPP_TPYE_DEV,
-	.low_temp_adjust = rockchip_dev_low_temp_adjust,
-	.high_temp_adjust = rockchip_dev_high_temp_adjust,
 };
 
 static struct pm_qos_request pm_qos;
@@ -1362,7 +1356,7 @@ static int rockchip_dmcfreq_target(struct device *dev, unsigned long *freq,
 	 * Go to specified cpufreq and block other cpufreq changes since
 	 * set_rate needs to complete during vblank.
 	 */
-	cpu_cur = smp_processor_id();
+	cpu_cur = raw_smp_processor_id();
 	policy = cpufreq_cpu_get(cpu_cur);
 	if (!policy) {
 		dev_err(dev, "cpu%d policy NULL\n", cpu_cur);
@@ -1462,6 +1456,9 @@ static int rockchip_dmcfreq_get_dev_status(struct device *dev,
 	struct rockchip_dmcfreq *dmcfreq = dev_get_drvdata(dev);
 	struct devfreq_event_data edata;
 	int i, j, ret = 0;
+
+	if (!dmcfreq->auto_freq_en)
+		return -EINVAL;
 
 	if (dmcfreq->dfi_id >= 0) {
 		ret = devfreq_event_get_event(dmcfreq->edev[dmcfreq->dfi_id],
@@ -1841,6 +1838,8 @@ static struct rk3368_dram_timing *of_get_rk3368_timings(struct device *dev,
 					    &timing->phy_dqs_drv);
 		ret |= of_property_read_u32(np_tim, "phy_odt",
 					    &timing->phy_odt);
+		ret |= of_property_read_u32(np_tim, "ddr_2t",
+					    &timing->ddr_2t);
 		if (ret) {
 			devm_kfree(dev, timing);
 			goto err;
@@ -2785,6 +2784,7 @@ static int rockchip_dmcfreq_system_status_notifier(struct notifier_block *nb,
 	}
 
 	if (dmcfreq->reboot_rate && (status & SYS_STATUS_REBOOT)) {
+		devfreq_monitor_stop(dmcfreq->devfreq);
 		target_rate = dmcfreq->reboot_rate;
 		goto next;
 	}
@@ -2832,48 +2832,6 @@ next:
 	dmcfreq->is_fixed = is_fixed;
 	dmcfreq->status_rate = target_rate;
 	rockchip_dmcfreq_update_target(dmcfreq);
-
-	return NOTIFY_OK;
-}
-
-static int rockchip_dmcfreq_reboot_notifier(struct notifier_block *nb,
-					    unsigned long action, void *ptr)
-{
-	struct rockchip_dmcfreq *dmcfreq = reboot_to_dmcfreq(nb);
-
-	devfreq_monitor_stop(dmcfreq->devfreq);
-	rockchip_set_system_status(SYS_STATUS_REBOOT);
-
-	return NOTIFY_OK;
-}
-
-static int rockchip_dmcfreq_fb_notifier(struct notifier_block *nb,
-					unsigned long action, void *ptr)
-{
-	struct fb_event *event = ptr;
-
-	switch (action) {
-	case FB_EARLY_EVENT_BLANK:
-		switch (*((int *)event->data)) {
-		case FB_BLANK_UNBLANK:
-			rockchip_clear_system_status(SYS_STATUS_SUSPEND);
-			break;
-		default:
-			break;
-		}
-		break;
-	case FB_EVENT_BLANK:
-		switch (*((int *)event->data)) {
-		case FB_BLANK_POWERDOWN:
-			rockchip_set_system_status(SYS_STATUS_SUSPEND);
-			break;
-		default:
-			break;
-		}
-		break;
-	default:
-		break;
-	}
 
 	return NOTIFY_OK;
 }
@@ -3051,6 +3009,8 @@ static int devfreq_dmc_ondemand_func(struct devfreq *df,
 			target_freq = dmcfreq->normal_rate;
 		if (target_freq)
 			*freq = target_freq;
+		if (dmcfreq->auto_freq_en && !devfreq_update_stats(df))
+			return 0;
 		goto reset_last_status;
 	}
 
@@ -3409,6 +3369,12 @@ static int rockchip_dmcfreq_add_devfreq(struct rockchip_dmcfreq *dmcfreq)
 	return 0;
 }
 
+static struct monitor_dev_profile dmc_mdevp = {
+	.type = MONITOR_TPYE_DEV,
+	.low_temp_adjust = rockchip_monitor_dev_low_temp_adjust,
+	.high_temp_adjust = rockchip_monitor_dev_high_temp_adjust,
+};
+
 static void rockchip_dmcfreq_register_notifier(struct rockchip_dmcfreq *dmcfreq)
 {
 	int ret;
@@ -3422,22 +3388,12 @@ static void rockchip_dmcfreq_register_notifier(struct rockchip_dmcfreq *dmcfreq)
 	if (ret)
 		dev_err(dmcfreq->dev, "failed to register system_status nb\n");
 
-	dmcfreq->reboot_nb.notifier_call = rockchip_dmcfreq_reboot_notifier;
-	ret = register_reboot_notifier(&dmcfreq->reboot_nb);
-	if (ret)
-		dev_err(dmcfreq->dev, "failed to register reboot nb\n");
-
-	dmcfreq->fb_nb.notifier_call = rockchip_dmcfreq_fb_notifier;
-	ret = fb_register_client(&dmcfreq->fb_nb);
-	if (ret)
-		dev_err(dmcfreq->dev, "failed to register fb nb\n");
-
-	dmc_devdata.data = dmcfreq->devfreq;
-	dmcfreq->opp_info = rockchip_register_thermal_notifier(dmcfreq->dev,
-							       &dmc_devdata);
-	if (IS_ERR(dmcfreq->opp_info)) {
-		dev_dbg(dmcfreq->dev, "without thermal notifier\n");
-		dmcfreq->opp_info = NULL;
+	dmc_mdevp.data = dmcfreq->devfreq;
+	dmcfreq->mdev_info = rockchip_system_monitor_register(dmcfreq->dev,
+							      &dmc_mdevp);
+	if (IS_ERR(dmcfreq->mdev_info)) {
+		dev_dbg(dmcfreq->dev, "without without system monitor\n");
+		dmcfreq->mdev_info = NULL;
 	}
 }
 

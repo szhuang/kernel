@@ -996,6 +996,7 @@
 		rockchip,cru = <&cru>;
 		rockchip,grf = <&grf>;
 		rockchip,mclk-calibrate;
+		rockchip,io-multiplex;
 		status = "disabled";
 	};
 
@@ -1318,6 +1319,13 @@
 		vad_sram: vad-sram@8000 {
 			reg = <0x8000 0x38000>;
 		};
+	};
+
+	rockchip_system_monitor: rockchip-system-monitor {
+		compatible = "rockchip,system-monitor";
+
+		rockchip,thermal-zone = "soc-thermal";
+		rockchip,polling-delay = <200>; /* milliseconds */
 	};
 
 	pinctrl: pinctrl {

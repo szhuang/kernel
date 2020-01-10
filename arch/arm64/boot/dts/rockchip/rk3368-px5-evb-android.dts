@@ -51,7 +51,7 @@
 	model = "Rockchip PX5 EVB V11";
 	compatible = "rockchip,px5-evb", "rockchip,px5", "rockchip,rk3368";
 
-	chosen {
+	chosen: chosen {
 		bootargs = "earlycon=uart8250,mmio32,0xff1c0000 swiotlb=1 firmware_class.path=/system/vendor/firmware";
 	};
 
@@ -92,12 +92,10 @@
 	};
 
 	xin32k: xin32k {
-		status = "okay";
-		compatible = "pwm-clock";
-		#clock-cells = <0>;
+		compatible = "fixed-clock";
 		clock-frequency = <32768>;
 		clock-output-names = "xin32k";
-		pwms = <&pwm1 0 30518 0>; /* 1 / 30518 ns = 32.7675 KHz */
+		#clock-cells = <0>;
 	};
 
 	sdio_pwrseq: sdio-pwrseq {

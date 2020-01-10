@@ -3,6 +3,10 @@
  * ov7251 driver
  *
  * Copyright (C) 2017 Fuzhou Rockchip Electronics Co., Ltd.
+ *
+ * V0.0X01.0X01 add poweron function.
+ * V0.0X01.0X02 fix mclk issue when probe multiple camera.
+ * V0.0X01.0X03 add enum_frame_interval function.
  */
 
 #include <linux/clk.h>
@@ -22,7 +26,7 @@
 #include <media/v4l2-ctrls.h>
 #include <media/v4l2-subdev.h>
 
-#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x0)
+#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x03)
 
 #ifndef V4L2_CID_DIGITAL_GAIN
 #define V4L2_CID_DIGITAL_GAIN		V4L2_CID_GAIN
@@ -83,7 +87,7 @@ struct regval {
 struct ov7251_mode {
 	u32 width;
 	u32 height;
-	u32 max_fps;
+	struct v4l2_fract max_fps;
 	u32 hts_def;
 	u32 vts_def;
 	u32 exp_def;
@@ -108,6 +112,7 @@ struct ov7251 {
 	struct v4l2_ctrl	*test_pattern;
 	struct mutex		mutex;
 	bool			streaming;
+	bool			power_on;
 	const struct ov7251_mode *cur_mode;
 	u32			module_index;
 	const char		*module_facing;
@@ -279,7 +284,10 @@ static const struct ov7251_mode supported_modes[] = {
 	{
 		.width = 640,
 		.height = 480,
-		.max_fps = 30,
+		.max_fps = {
+			.numerator = 10000,
+			.denominator = 300000,
+		},
 		.exp_def = 0x061c,
 		.hts_def = 0x03a0,
 		.vts_def = 0x06b8,
@@ -515,8 +523,7 @@ static int ov7251_g_frame_interval(struct v4l2_subdev *sd,
 	const struct ov7251_mode *mode = ov7251->cur_mode;
 
 	mutex_lock(&ov7251->mutex);
-	fi->interval.numerator = 10000;
-	fi->interval.denominator = mode->max_fps * 10000;
+	fi->interval = mode->max_fps;
 	mutex_unlock(&ov7251->mutex);
 
 	return 0;
@@ -654,6 +661,37 @@ unlock_and_return:
 	return ret;
 }
 
+static int ov7251_s_power(struct v4l2_subdev *sd, int on)
+{
+	struct ov7251 *ov7251 = to_ov7251(sd);
+	struct i2c_client *client = ov7251->client;
+	int ret = 0;
+
+	mutex_lock(&ov7251->mutex);
+
+	/* If the power state is not modified - no work to do. */
+	if (ov7251->power_on == !!on)
+		goto unlock_and_return;
+
+	if (on) {
+		ret = pm_runtime_get_sync(&client->dev);
+		if (ret < 0) {
+			pm_runtime_put_noidle(&client->dev);
+			goto unlock_and_return;
+		}
+
+		ov7251->power_on = true;
+	} else {
+		pm_runtime_put(&client->dev);
+		ov7251->power_on = false;
+	}
+
+unlock_and_return:
+	mutex_unlock(&ov7251->mutex);
+
+	return ret;
+}
+
 /* Calculate the delay in us by clock rate and clock cycles */
 static inline u32 ov7251_cal_delay(u32 cycles)
 {
@@ -666,6 +704,11 @@ static int __ov7251_power_on(struct ov7251 *ov7251)
 	u32 delay_us;
 	struct device *dev = &ov7251->client->dev;
 
+	ret = clk_set_rate(ov7251->xvclk, OV7251_XVCLK_FREQ);
+	if (ret < 0)
+		dev_warn(dev, "Failed to set xvclk rate (24MHz)\n");
+	if (clk_get_rate(ov7251->xvclk) != OV7251_XVCLK_FREQ)
+		dev_warn(dev, "xvclk mismatched, modes are based on 24MHz\n");
 	ret = clk_prepare_enable(ov7251->xvclk);
 	if (ret < 0) {
 		dev_err(dev, "Failed to enable xvclk\n");
@@ -753,6 +796,22 @@ static int ov7251_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 }
 #endif
 
+static int ov7251_enum_frame_interval(struct v4l2_subdev *sd,
+				       struct v4l2_subdev_pad_config *cfg,
+				       struct v4l2_subdev_frame_interval_enum *fie)
+{
+	if (fie->index >= ARRAY_SIZE(supported_modes))
+		return -EINVAL;
+
+	if (fie->code != MEDIA_BUS_FMT_Y10_1X10)
+		return -EINVAL;
+
+	fie->width = supported_modes[fie->index].width;
+	fie->height = supported_modes[fie->index].height;
+	fie->interval = supported_modes[fie->index].max_fps;
+	return 0;
+}
+
 static const struct dev_pm_ops ov7251_pm_ops = {
 	SET_RUNTIME_PM_OPS(ov7251_runtime_suspend,
 			   ov7251_runtime_resume, NULL)
@@ -765,6 +824,7 @@ static const struct v4l2_subdev_internal_ops ov7251_internal_ops = {
 #endif
 
 static const struct v4l2_subdev_core_ops ov7251_core_ops = {
+	.s_power = ov7251_s_power,
 	.ioctl = ov7251_ioctl,
 #ifdef CONFIG_COMPAT
 	.compat_ioctl32 = ov7251_compat_ioctl32,
@@ -779,6 +839,7 @@ static const struct v4l2_subdev_video_ops ov7251_video_ops = {
 static const struct v4l2_subdev_pad_ops ov7251_pad_ops = {
 	.enum_mbus_code = ov7251_enum_mbus_code,
 	.enum_frame_size = ov7251_enum_frame_sizes,
+	.enum_frame_interval = ov7251_enum_frame_interval,
 	.get_fmt = ov7251_get_fmt,
 	.set_fmt = ov7251_set_fmt,
 };
@@ -926,7 +987,7 @@ static int ov7251_check_sensor_id(struct ov7251 *ov7251,
 			      OV7251_REG_VALUE_16BIT, &id);
 	if (id != CHIP_ID) {
 		dev_err(dev, "Unexpected sensor id(%06x), ret(%d)\n", id, ret);
-		return ret;
+		return -ENODEV;
 	}
 
 	dev_info(dev, "Detected OV%06x sensor\n", CHIP_ID);
@@ -986,13 +1047,6 @@ static int ov7251_probe(struct i2c_client *client,
 		dev_err(dev, "Failed to get xvclk\n");
 		return -EINVAL;
 	}
-	ret = clk_set_rate(ov7251->xvclk, OV7251_XVCLK_FREQ);
-	if (ret < 0) {
-		dev_err(dev, "Failed to set xvclk rate (24MHz)\n");
-		return ret;
-	}
-	if (clk_get_rate(ov7251->xvclk) != OV7251_XVCLK_FREQ)
-		dev_warn(dev, "xvclk mismatched, modes are based on 24MHz\n");
 
 	ov7251->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_LOW);
 	if (IS_ERR(ov7251->reset_gpio))

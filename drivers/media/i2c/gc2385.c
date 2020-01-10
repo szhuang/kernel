@@ -3,6 +3,10 @@
  * gc2385 driver
  *
  * Copyright (C) 2017 Fuzhou Rockchip Electronics Co., Ltd.
+ *
+ * V0.0X01.0X01 add poweron function.
+ * V0.0X01.0X02 fix mclk issue when probe multiple camera.
+ * V0.0X01.0X03 add enum_frame_interval function.
  */
 
 #include <linux/clk.h>
@@ -22,7 +26,7 @@
 #include <media/v4l2-subdev.h>
 #include <linux/pinctrl/consumer.h>
 
-#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x0)
+#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x03)
 
 #ifndef V4L2_CID_DIGITAL_GAIN
 #define V4L2_CID_DIGITAL_GAIN		V4L2_CID_GAIN
@@ -48,7 +52,7 @@
 
 #define GC2385_REG_EXPOSURE_H		0x03
 #define GC2385_REG_EXPOSURE_L		0x04
-#define GC2385_FETCH_HIGH_BYTE_EXP(VAL) (((VAL) >> 8) & 0x0F)	/* 4 Bits */
+#define GC2385_FETCH_HIGH_BYTE_EXP(VAL) (((VAL) >> 8) & 0x3F)	/* 6 Bits */
 #define GC2385_FETCH_LOW_BYTE_EXP(VAL) ((VAL) & 0xFF)	/* 8 Bits */
 #define	GC2385_EXPOSURE_MIN		4
 #define	GC2385_EXPOSURE_STEP		1
@@ -114,6 +118,7 @@ struct gc2385 {
 	struct v4l2_ctrl	*vblank;
 	struct mutex		mutex;
 	bool			streaming;
+	bool			power_on;
 	const struct gc2385_mode *cur_mode;
 	u32			module_index;
 	const char		*module_facing;
@@ -516,9 +521,6 @@ static int __gc2385_start_stream(struct gc2385 *gc2385)
 {
 	int ret;
 
-	ret = gc2385_write_array(gc2385->client, gc2385_global_regs);
-	if (ret)
-		return ret;
 	ret = gc2385_write_array(gc2385->client, gc2385->cur_mode->reg_list);
 	if (ret)
 		return ret;
@@ -586,6 +588,44 @@ unlock_and_return:
 	return ret;
 }
 
+static int gc2385_s_power(struct v4l2_subdev *sd, int on)
+{
+	struct gc2385 *gc2385 = to_gc2385(sd);
+	struct i2c_client *client = gc2385->client;
+	int ret = 0;
+
+	mutex_lock(&gc2385->mutex);
+
+	/* If the power state is not modified - no work to do. */
+	if (gc2385->power_on == !!on)
+		goto unlock_and_return;
+
+	if (on) {
+		ret = pm_runtime_get_sync(&client->dev);
+		if (ret < 0) {
+			pm_runtime_put_noidle(&client->dev);
+			goto unlock_and_return;
+		}
+
+		ret = gc2385_write_array(gc2385->client, gc2385_global_regs);
+		if (ret) {
+			v4l2_err(sd, "could not set init registers\n");
+			pm_runtime_put_noidle(&client->dev);
+			goto unlock_and_return;
+		}
+
+		gc2385->power_on = true;
+	} else {
+		pm_runtime_put(&client->dev);
+		gc2385->power_on = false;
+	}
+
+unlock_and_return:
+	mutex_unlock(&gc2385->mutex);
+
+	return ret;
+}
+
 /* Calculate the delay in us by clock rate and clock cycles */
 static inline u32 gc2385_cal_delay(u32 cycles)
 {
@@ -604,13 +644,16 @@ static int __gc2385_power_on(struct gc2385 *gc2385)
 		if (ret < 0)
 			dev_err(dev, "could not set pins\n");
 	}
-
+	ret = clk_set_rate(gc2385->xvclk, GC2385_XVCLK_FREQ);
+	if (ret < 0)
+		dev_warn(dev, "Failed to set xvclk rate (24MHz)\n");
+	if (clk_get_rate(gc2385->xvclk) != GC2385_XVCLK_FREQ)
+		dev_warn(dev, "xvclk mismatched, modes are based on 24MHz\n");
 	ret = clk_prepare_enable(gc2385->xvclk);
 	if (ret < 0) {
 		dev_err(dev, "Failed to enable xvclk\n");
 		return ret;
 	}
-
 	if (!IS_ERR(gc2385->reset_gpio))
 		gpiod_set_value_cansleep(gc2385->reset_gpio, 1);
 
@@ -626,7 +669,7 @@ static int __gc2385_power_on(struct gc2385 *gc2385)
 
 	usleep_range(500, 1000);
 	if (!IS_ERR(gc2385->pwdn_gpio))
-		gpiod_set_value_cansleep(gc2385->pwdn_gpio, 0);
+		gpiod_set_value_cansleep(gc2385->pwdn_gpio, 1);
 
 	/* 8192 cycles prior to first SCCB transaction */
 	delay_us = gc2385_cal_delay(8192);
@@ -645,7 +688,7 @@ static void __gc2385_power_off(struct gc2385 *gc2385)
 	int ret = 0;
 
 	if (!IS_ERR(gc2385->pwdn_gpio))
-		gpiod_set_value_cansleep(gc2385->pwdn_gpio, 1);
+		gpiod_set_value_cansleep(gc2385->pwdn_gpio, 0);
 	clk_disable_unprepare(gc2385->xvclk);
 	if (!IS_ERR(gc2385->reset_gpio))
 		gpiod_set_value_cansleep(gc2385->reset_gpio, 1);
@@ -700,6 +743,22 @@ static int gc2385_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 }
 #endif
 
+static int gc2385_enum_frame_interval(struct v4l2_subdev *sd,
+				       struct v4l2_subdev_pad_config *cfg,
+				       struct v4l2_subdev_frame_interval_enum *fie)
+{
+	if (fie->index >= ARRAY_SIZE(supported_modes))
+		return -EINVAL;
+
+	if (fie->code != MEDIA_BUS_FMT_SBGGR10_1X10)
+		return -EINVAL;
+
+	fie->width = supported_modes[fie->index].width;
+	fie->height = supported_modes[fie->index].height;
+	fie->interval = supported_modes[fie->index].max_fps;
+	return 0;
+}
+
 static const struct dev_pm_ops gc2385_pm_ops = {
 	SET_RUNTIME_PM_OPS(gc2385_runtime_suspend,
 			   gc2385_runtime_resume, NULL)
@@ -712,6 +771,7 @@ static const struct v4l2_subdev_internal_ops gc2385_internal_ops = {
 #endif
 
 static const struct v4l2_subdev_core_ops gc2385_core_ops = {
+	.s_power = gc2385_s_power,
 	.ioctl = gc2385_ioctl,
 #ifdef CONFIG_COMPAT
 	.compat_ioctl32 = gc2385_compat_ioctl32,
@@ -726,6 +786,7 @@ static const struct v4l2_subdev_video_ops gc2385_video_ops = {
 static const struct v4l2_subdev_pad_ops gc2385_pad_ops = {
 	.enum_mbus_code = gc2385_enum_mbus_code,
 	.enum_frame_size = gc2385_enum_frame_sizes,
+	.enum_frame_interval = gc2385_enum_frame_interval,
 	.get_fmt = gc2385_get_fmt,
 	.set_fmt = gc2385_set_fmt,
 };
@@ -1000,7 +1061,7 @@ static int gc2385_check_sensor_id(struct gc2385 *gc2385,
 	id = ((reg_H << 8) & 0xff00) | (reg_L & 0xff);
 	if (id != CHIP_ID) {
 		dev_err(dev, "Unexpected sensor id(%06x), ret(%d)\n", id, ret);
-		return ret;
+		return -ENODEV;
 	}
 	return ret;
 }
@@ -1056,13 +1117,6 @@ static int gc2385_probe(struct i2c_client *client,
 		dev_err(dev, "Failed to get xvclk\n");
 		return -EINVAL;
 	}
-	ret = clk_set_rate(gc2385->xvclk, GC2385_XVCLK_FREQ);
-	if (ret < 0) {
-		dev_err(dev, "Failed to set xvclk rate (24MHz)\n");
-		return ret;
-	}
-	if (clk_get_rate(gc2385->xvclk) != GC2385_XVCLK_FREQ)
-		dev_warn(dev, "xvclk mismatched, modes are based on 24MHz\n");
 
 	gc2385->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_LOW);
 	if (IS_ERR(gc2385->reset_gpio))

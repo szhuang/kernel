@@ -3,6 +3,9 @@
  * ov5695 driver
  *
  * Copyright (C) 2017 Fuzhou Rockchip Electronics Co., Ltd.
+ *
+ * V0.0X01.0X01 add poweron function.
+ * V0.0X01.0X02 add enum_frame_interval function.
  */
 
 #include <linux/clk.h>
@@ -22,7 +25,7 @@
 #include <media/v4l2-ctrls.h>
 #include <media/v4l2-subdev.h>
 
-#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x0)
+#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x02)
 
 #ifndef V4L2_CID_DIGITAL_GAIN
 #define V4L2_CID_DIGITAL_GAIN		V4L2_CID_GAIN
@@ -96,7 +99,7 @@ struct regval {
 struct ov5695_mode {
 	u32 width;
 	u32 height;
-	u32 max_fps;
+	struct v4l2_fract max_fps;
 	u32 hts_def;
 	u32 vts_def;
 	u32 exp_def;
@@ -121,6 +124,7 @@ struct ov5695 {
 	struct v4l2_ctrl	*test_pattern;
 	struct mutex		mutex;
 	bool			streaming;
+	bool			power_on;
 	const struct ov5695_mode *cur_mode;
 	u32			module_index;
 	const char		*module_facing;
@@ -503,7 +507,10 @@ static const struct ov5695_mode supported_modes[] = {
 	{
 		.width = 2592,
 		.height = 1944,
-		.max_fps = 30,
+		.max_fps = {
+			.numerator = 10000,
+			.denominator = 300000,
+		},
 		.exp_def = 0x0450,
 		.hts_def = 0x02e4 * 4,
 		.vts_def = 0x07e8,
@@ -512,7 +519,10 @@ static const struct ov5695_mode supported_modes[] = {
 	{
 		.width = 1920,
 		.height = 1080,
-		.max_fps = 30,
+		.max_fps = {
+			.numerator = 10000,
+			.denominator = 300000,
+		},
 		.exp_def = 0x0450,
 		.hts_def = 0x02a0 * 4,
 		.vts_def = 0x08b8,
@@ -521,7 +531,10 @@ static const struct ov5695_mode supported_modes[] = {
 	{
 		.width = 1296,
 		.height = 972,
-		.max_fps = 60,
+		.max_fps = {
+			.numerator = 10000,
+			.denominator = 600000,
+		},
 		.exp_def = 0x03e0,
 		.hts_def = 0x02e4 * 4,
 		.vts_def = 0x03f4,
@@ -530,7 +543,10 @@ static const struct ov5695_mode supported_modes[] = {
 	{
 		.width = 1280,
 		.height = 720,
-		.max_fps = 30,
+		.max_fps = {
+			.numerator = 10000,
+			.denominator = 300000,
+		},
 		.exp_def = 0x0450,
 		.hts_def = 0x02a0 * 4,
 		.vts_def = 0x08b8,
@@ -539,7 +555,10 @@ static const struct ov5695_mode supported_modes[] = {
 	{
 		.width = 640,
 		.height = 480,
-		.max_fps = 120,
+		.max_fps = {
+			.numerator = 10000,
+			.denominator = 1200000,
+		},
 		.exp_def = 0x0450,
 		.hts_def = 0x02a0 * 4,
 		.vts_def = 0x022e,
@@ -821,8 +840,7 @@ static int ov5695_g_frame_interval(struct v4l2_subdev *sd,
 	const struct ov5695_mode *mode = ov5695->cur_mode;
 
 	mutex_lock(&ov5695->mutex);
-	fi->interval.numerator = 10000;
-	fi->interval.denominator = mode->max_fps * 10000;
+	fi->interval = mode->max_fps;
 	mutex_unlock(&ov5695->mutex);
 
 	return 0;
@@ -902,9 +920,6 @@ static int __ov5695_start_stream(struct ov5695 *ov5695)
 {
 	int ret;
 
-	ret = ov5695_write_array(ov5695->client, ov5695_global_regs);
-	if (ret)
-		return ret;
 	ret = ov5695_write_array(ov5695->client, ov5695->cur_mode->reg_list);
 	if (ret)
 		return ret;
@@ -956,6 +971,44 @@ static int ov5695_s_stream(struct v4l2_subdev *sd, int on)
 	}
 
 	ov5695->streaming = on;
+
+unlock_and_return:
+	mutex_unlock(&ov5695->mutex);
+
+	return ret;
+}
+
+static int ov5695_s_power(struct v4l2_subdev *sd, int on)
+{
+	struct ov5695 *ov5695 = to_ov5695(sd);
+	struct i2c_client *client = ov5695->client;
+	int ret = 0;
+
+	mutex_lock(&ov5695->mutex);
+
+	/* If the power state is not modified - no work to do. */
+	if (ov5695->power_on == !!on)
+		goto unlock_and_return;
+
+	if (on) {
+		ret = pm_runtime_get_sync(&client->dev);
+		if (ret < 0) {
+			pm_runtime_put_noidle(&client->dev);
+			goto unlock_and_return;
+		}
+
+		ret = ov5695_write_array(ov5695->client, ov5695_global_regs);
+		if (ret) {
+			v4l2_err(sd, "could not set init registers\n");
+			pm_runtime_put_noidle(&client->dev);
+			goto unlock_and_return;
+		}
+
+		ov5695->power_on = true;
+	} else {
+		pm_runtime_put(&client->dev);
+		ov5695->power_on = false;
+	}
 
 unlock_and_return:
 	mutex_unlock(&ov5695->mutex);
@@ -1067,6 +1120,22 @@ static int ov5695_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 }
 #endif
 
+static int ov5695_enum_frame_interval(struct v4l2_subdev *sd,
+				      struct v4l2_subdev_pad_config *cfg,
+				      struct v4l2_subdev_frame_interval_enum *fie)
+{
+	if (fie->index >= ARRAY_SIZE(supported_modes))
+		return -EINVAL;
+
+	if (fie->code != MEDIA_BUS_FMT_SBGGR10_1X10)
+		return -EINVAL;
+
+	fie->width = supported_modes[fie->index].width;
+	fie->height = supported_modes[fie->index].height;
+	fie->interval = supported_modes[fie->index].max_fps;
+	return 0;
+}
+
 static const struct dev_pm_ops ov5695_pm_ops = {
 	SET_RUNTIME_PM_OPS(ov5695_runtime_suspend,
 			   ov5695_runtime_resume, NULL)
@@ -1079,6 +1148,7 @@ static const struct v4l2_subdev_internal_ops ov5695_internal_ops = {
 #endif
 
 static const struct v4l2_subdev_core_ops ov5695_core_ops = {
+	.s_power = ov5695_s_power,
 	.ioctl = ov5695_ioctl,
 #ifdef CONFIG_COMPAT
 	.compat_ioctl32 = ov5695_compat_ioctl32,
@@ -1093,6 +1163,7 @@ static const struct v4l2_subdev_video_ops ov5695_video_ops = {
 static const struct v4l2_subdev_pad_ops ov5695_pad_ops = {
 	.enum_mbus_code = ov5695_enum_mbus_code,
 	.enum_frame_size = ov5695_enum_frame_sizes,
+	.enum_frame_interval = ov5695_enum_frame_interval,
 	.get_fmt = ov5695_get_fmt,
 	.set_fmt = ov5695_set_fmt,
 };
@@ -1253,7 +1324,7 @@ static int ov5695_check_sensor_id(struct ov5695 *ov5695,
 			      OV5695_REG_VALUE_24BIT, &id);
 	if (id != CHIP_ID) {
 		dev_err(dev, "Unexpected sensor id(%06x), ret(%d)\n", id, ret);
-		return ret;
+		return -ENODEV;
 	}
 
 	dev_info(dev, "Detected OV%06x sensor\n", CHIP_ID);

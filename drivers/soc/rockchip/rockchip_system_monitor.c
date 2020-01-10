@@ -8,6 +8,7 @@
 #include <linux/cpu.h>
 #include <linux/cpufreq.h>
 #include <linux/device.h>
+#include <linux/fb.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/notifier.h>
@@ -15,6 +16,7 @@
 #include <linux/platform_device.h>
 #include <linux/pm_opp.h>
 #include <linux/uaccess.h>
+#include <linux/reboot.h>
 #include <linux/slab.h>
 #include <linux/suspend.h>
 #include <linux/thermal.h>
@@ -25,6 +27,7 @@
 #include "../../base/power/opp/opp.h"
 #include "../../devfreq/governor.h"
 
+#define CPU_REBOOT_FREQ		816000 /* kHz */
 #define VIDEO_1080P_SIZE	(1920 * 1080)
 #define THERMAL_POLLING_DELAY	200 /* milliseconds */
 
@@ -198,7 +201,7 @@ static struct video_info *rockchip_parse_video_info(const char *buf)
 {
 	struct video_info *video_info;
 	const char *cp = buf;
-	char *str;
+	char *str, *p;
 	int ntokens = 0;
 
 	while ((cp = strpbrk(cp + 1, ",")))
@@ -213,12 +216,13 @@ static struct video_info *rockchip_parse_video_info(const char *buf)
 	INIT_LIST_HEAD(&video_info->node);
 
 	str = kstrdup(buf, GFP_KERNEL);
-	strsep(&str, ",");
-	video_info->width = rockchip_get_video_param(&str);
-	video_info->height = rockchip_get_video_param(&str);
-	video_info->ishevc = rockchip_get_video_param(&str);
-	video_info->videoFramerate = rockchip_get_video_param(&str);
-	video_info->streamBitrate = rockchip_get_video_param(&str);
+	p = str;
+	strsep(&p, ",");
+	video_info->width = rockchip_get_video_param(&p);
+	video_info->height = rockchip_get_video_param(&p);
+	video_info->ishevc = rockchip_get_video_param(&p);
+	video_info->videoFramerate = rockchip_get_video_param(&p);
+	video_info->streamBitrate = rockchip_get_video_param(&p);
 	pr_debug("%c,width=%d,height=%d,ishevc=%d,videoFramerate=%d,streamBitrate=%d\n",
 		 buf[0],
 		 video_info->width,
@@ -585,6 +589,25 @@ err:
 	return ret;
 }
 
+static int monitor_device_parse_status_config(struct device_node *np,
+					      struct monitor_dev_info *info)
+{
+	int ret;
+
+	ret = of_property_read_u32(np, "rockchip,video-4k-freq",
+				   &info->video_4k_freq);
+	ret &= of_property_read_u32(np, "rockchip,reboot-freq",
+				    &info->reboot_freq);
+	if (info->devp->type == MONITOR_TPYE_CPU) {
+		if (!info->reboot_freq) {
+			info->reboot_freq = CPU_REBOOT_FREQ;
+			ret = 0;
+		}
+	}
+
+	return ret;
+}
+
 static int rockchip_get_temp_freq_table(struct device_node *np,
 					char *porp_name,
 					struct temp_freq_table **freq_table)
@@ -629,7 +652,7 @@ static int monitor_device_parse_dt(struct device *dev,
 	struct device_node *np;
 	int ret = 0;
 	bool is_wide_temp_en = false;
-	bool is_4k_limit_en = false;
+	bool is_status_limit_en = false;
 	bool is_temp_freq_en = false;
 
 	np = of_parse_phandle(dev->of_node, "operating-points-v2", 0);
@@ -638,13 +661,12 @@ static int monitor_device_parse_dt(struct device *dev,
 
 	if (!monitor_device_parse_wide_temp_config(np, info))
 		is_wide_temp_en = true;
-	if (!of_property_read_u32(np, "rockchip,video-4k-freq",
-				  &info->video_4k_freq))
-		is_4k_limit_en = true;
+	if (!monitor_device_parse_status_config(np, info))
+		is_status_limit_en = true;
 	if (!rockchip_get_temp_freq_table(np, "rockchip,temp-freq-table",
 					  &info->temp_freq_table))
 		is_temp_freq_en = true;
-	if (is_wide_temp_en || is_4k_limit_en || is_temp_freq_en)
+	if (is_wide_temp_en || is_status_limit_en || is_temp_freq_en)
 		ret = 0;
 	else
 		ret = -EINVAL;
@@ -962,7 +984,7 @@ static unsigned long monitor_freq_to_state(struct monitor_dev_info *info,
 static int monitor_temp_to_state(struct monitor_dev_info *info,
 				 int temp, unsigned long *state)
 {
-	unsigned long target_freq = 0;
+	unsigned long target_state, target_freq = 0;
 	int i;
 
 	if (temp == THERMAL_TEMP_INVALID)
@@ -979,6 +1001,13 @@ static int monitor_temp_to_state(struct monitor_dev_info *info,
 			*state = 0;
 	}
 
+	if (info->status_min_limit) {
+		target_freq = info->status_min_limit * 1000;
+		target_state = monitor_freq_to_state(info, target_freq);
+		if (*state > target_state)
+			*state = target_state;
+	}
+
 	return 0;
 }
 
@@ -990,7 +1019,7 @@ rockchip_system_monitor_adjust_cdev_state(struct thermal_cooling_device *cdev,
 
 	down_read(&mdev_list_sem);
 	list_for_each_entry(info, &monitor_dev_list, node) {
-		if (info->cdev != cdev)
+		if (cdev->np != info->dev->of_node)
 			continue;
 		monitor_temp_to_state(info, temp, state);
 		break;
@@ -1008,6 +1037,9 @@ rockchip_system_monitor_register(struct device *dev,
 	struct monitor_dev_info *info;
 	struct devfreq *devfreq;
 	int ret;
+
+	if (!system_monitor)
+		return ERR_PTR(-ENOMEM);
 
 	info = kzalloc(sizeof(*info), GFP_KERNEL);
 	if (!info)
@@ -1041,7 +1073,7 @@ free_info:
 	kfree(info);
 	return ERR_PTR(-EINVAL);
 }
-EXPORT_SYMBOL_GPL(rockchip_system_monitor_register);
+EXPORT_SYMBOL(rockchip_system_monitor_register);
 
 void rockchip_system_monitor_unregister(struct monitor_dev_info *info)
 {
@@ -1059,8 +1091,6 @@ void rockchip_system_monitor_unregister(struct monitor_dev_info *info)
 		devm_devfreq_unregister_notifier(info->dev, devfreq,
 						 &info->devfreq_nb,
 						 DEVFREQ_TRANSITION_NOTIFIER);
-
-	kfree(info->devp);
 	kfree(info->low_temp_adjust_table);
 	kfree(info->opp_table);
 	kfree(info->freq_table);
@@ -1194,24 +1224,40 @@ static void rockchip_system_monitor_thermal_check(struct work_struct *work)
 	rockchip_system_monitor_thermal_update();
 }
 
+static void rockchip_system_status_cpu_limit_freq(struct monitor_dev_info *info,
+						  unsigned long status)
+{
+	unsigned int target_freq = 0;
+	bool is_freq_fixed = false;
+	int cpu;
+
+	if (status & SYS_STATUS_REBOOT) {
+		info->status_min_limit = info->reboot_freq;
+		info->status_max_limit = info->reboot_freq;
+		info->is_status_freq_fixed = true;
+		goto next;
+	}
+
+	if (info->video_4k_freq && (status & SYS_STATUS_VIDEO_4K))
+		target_freq = info->video_4k_freq;
+	if (target_freq == info->status_max_limit &&
+	    info->is_status_freq_fixed == is_freq_fixed)
+		return;
+	info->status_max_limit = target_freq;
+	info->is_status_freq_fixed = is_freq_fixed;
+next:
+	cpu = cpumask_any(&info->devp->allowed_cpus);
+	cpufreq_update_policy(cpu);
+}
+
 static void rockchip_system_status_limit_freq(unsigned long status)
 {
 	struct monitor_dev_info *info;
-	unsigned int target_freq, cpu;
 
 	down_read(&mdev_list_sem);
 	list_for_each_entry(info, &monitor_dev_list, node) {
-		if (info->devp->type != MONITOR_TPYE_CPU)
-			continue;
-		if (status & SYS_STATUS_VIDEO_4K)
-			target_freq = info->video_4k_freq;
-		else
-			target_freq = 0;
-		if (target_freq != info->status_limit) {
-			info->status_limit = target_freq;
-			cpu = cpumask_any(&info->devp->allowed_cpus);
-			cpufreq_update_policy(cpu);
-		}
+		if (info->devp->type == MONITOR_TPYE_CPU)
+			rockchip_system_status_cpu_limit_freq(info, status);
 	}
 	up_read(&mdev_list_sem);
 }
@@ -1293,10 +1339,18 @@ static int rockchip_monitor_cpufreq_policy_notifier(struct notifier_block *nb,
 			if (limit_freq > info->wide_temp_limit / 1000)
 				limit_freq = info->wide_temp_limit / 1000;
 		}
-		if (info->status_limit && limit_freq > info->status_limit)
-			limit_freq = info->status_limit;
-		if (limit_freq < policy->max)
+		if (info->status_max_limit &&
+		    limit_freq > info->status_max_limit)
+			limit_freq = info->status_max_limit;
+
+		if (info->is_status_freq_fixed) {
+			cpufreq_verify_within_limits(policy, limit_freq,
+						     limit_freq);
+			dev_info(info->dev, "min=%u, max=%u\n", policy->min,
+				 policy->max);
+		} else if (limit_freq < policy->max) {
 			cpufreq_verify_within_limits(policy, 0, limit_freq);
+		}
 	}
 	up_read(&mdev_list_sem);
 
@@ -1305,6 +1359,53 @@ static int rockchip_monitor_cpufreq_policy_notifier(struct notifier_block *nb,
 
 static struct notifier_block rockchip_monitor_cpufreq_policy_nb = {
 	.notifier_call = rockchip_monitor_cpufreq_policy_notifier,
+};
+
+static int rockchip_monitor_reboot_notifier(struct notifier_block *nb,
+					     unsigned long action, void *ptr)
+{
+	rockchip_set_system_status(SYS_STATUS_REBOOT);
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block rockchip_monitor_reboot_nb = {
+	.notifier_call = rockchip_monitor_reboot_notifier,
+};
+
+static int rockchip_monitor_fb_notifier(struct notifier_block *nb,
+					unsigned long action, void *ptr)
+{
+	struct fb_event *event = ptr;
+
+	switch (action) {
+	case FB_EARLY_EVENT_BLANK:
+		switch (*((int *)event->data)) {
+		case FB_BLANK_UNBLANK:
+			rockchip_clear_system_status(SYS_STATUS_SUSPEND);
+			break;
+		default:
+			break;
+		}
+		break;
+	case FB_EVENT_BLANK:
+		switch (*((int *)event->data)) {
+		case FB_BLANK_POWERDOWN:
+			rockchip_set_system_status(SYS_STATUS_SUSPEND);
+			break;
+		default:
+			break;
+		}
+		break;
+	default:
+		break;
+	}
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block rockchip_monitor_fb_nb = {
+	.notifier_call = rockchip_monitor_fb_notifier,
 };
 
 static int rockchip_system_monitor_probe(struct platform_device *pdev)
@@ -1344,6 +1445,13 @@ static int rockchip_system_monitor_probe(struct platform_device *pdev)
 
 	cpufreq_register_notifier(&rockchip_monitor_cpufreq_policy_nb,
 				  CPUFREQ_POLICY_NOTIFIER);
+
+	register_reboot_notifier(&rockchip_monitor_reboot_nb);
+
+	if (fb_register_client(&rockchip_monitor_fb_nb))
+		dev_err(dev, "failed to register fb nb\n");
+
+	dev_info(dev, "system monitor probe\n");
 
 	return 0;
 }

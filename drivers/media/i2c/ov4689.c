@@ -3,6 +3,11 @@
  * ov4689 driver
  *
  * Copyright (C) 2017 Fuzhou Rockchip Electronics Co., Ltd.
+ *
+ * V0.0X01.0X01 add poweron function.
+ * V0.0X01.0X02 fix mclk issue when probe multiple camera.
+ * V0.0X01.0X03 fix gain range.
+ * V0.0X01.0X04 add enum_frame_interval function.
  */
 
 #include <linux/clk.h>
@@ -23,7 +28,7 @@
 #include <media/v4l2-subdev.h>
 #include <linux/pinctrl/consumer.h>
 
-#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x0)
+#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x04)
 
 #ifndef V4L2_CID_DIGITAL_GAIN
 #define V4L2_CID_DIGITAL_GAIN		V4L2_CID_GAIN
@@ -51,10 +56,10 @@
 #define OV4689_GAIN_H_MASK		0x07
 #define OV4689_GAIN_H_SHIFT		8
 #define OV4689_GAIN_L_MASK		0xff
-#define OV4689_GAIN_MIN			0x10
-#define OV4689_GAIN_MAX			0xf8
+#define OV4689_GAIN_MIN			0x80
+#define OV4689_GAIN_MAX			0x7f8
 #define OV4689_GAIN_STEP		1
-#define OV4689_GAIN_DEFAULT		0x10
+#define OV4689_GAIN_DEFAULT		0x80
 
 #define OV4689_REG_TEST_PATTERN		0x5040
 #define OV4689_TEST_PATTERN_ENABLE	0x80
@@ -92,7 +97,7 @@ struct regval {
 struct ov4689_mode {
 	u32 width;
 	u32 height;
-	u32 max_fps;
+	struct v4l2_fract max_fps;
 	u32 hts_def;
 	u32 vts_def;
 	u32 exp_def;
@@ -121,6 +126,7 @@ struct ov4689 {
 	struct v4l2_ctrl	*test_pattern;
 	struct mutex		mutex;
 	bool			streaming;
+	bool			power_on;
 	const struct ov4689_mode *cur_mode;
 	u32			module_index;
 	const char		*module_facing;
@@ -402,7 +408,10 @@ static const struct ov4689_mode supported_modes[] = {
 	{
 		.width = 2688,
 		.height = 1520,
-		.max_fps = 30,
+		.max_fps = {
+			.numerator = 10000,
+			.denominator = 300000,
+		},
 		.exp_def = 0x0600,
 		.hts_def = 0x0a18,
 		.vts_def = 0x0612,
@@ -639,8 +648,7 @@ static int ov4689_g_frame_interval(struct v4l2_subdev *sd,
 	const struct ov4689_mode *mode = ov4689->cur_mode;
 
 	mutex_lock(&ov4689->mutex);
-	fi->interval.numerator = 10000;
-	fi->interval.denominator = mode->max_fps * 10000;
+	fi->interval = mode->max_fps;
 	mutex_unlock(&ov4689->mutex);
 
 	return 0;
@@ -720,10 +728,6 @@ static int __ov4689_start_stream(struct ov4689 *ov4689)
 {
 	int ret;
 
-	ret = ov4689_write_array(ov4689->client, ov4689_global_regs);
-	if (ret)
-		return ret;
-
 	ret = ov4689_write_array(ov4689->client, ov4689->cur_mode->reg_list);
 	if (ret)
 		return ret;
@@ -782,6 +786,44 @@ unlock_and_return:
 	return ret;
 }
 
+static int ov4689_s_power(struct v4l2_subdev *sd, int on)
+{
+	struct ov4689 *ov4689 = to_ov4689(sd);
+	struct i2c_client *client = ov4689->client;
+	int ret = 0;
+
+	mutex_lock(&ov4689->mutex);
+
+	/* If the power state is not modified - no work to do. */
+	if (ov4689->power_on == !!on)
+		goto unlock_and_return;
+
+	if (on) {
+		ret = pm_runtime_get_sync(&client->dev);
+		if (ret < 0) {
+			pm_runtime_put_noidle(&client->dev);
+			goto unlock_and_return;
+		}
+
+		ret = ov4689_write_array(ov4689->client, ov4689_global_regs);
+		if (ret) {
+			v4l2_err(sd, "could not set init registers\n");
+			pm_runtime_put_noidle(&client->dev);
+			goto unlock_and_return;
+		}
+
+		ov4689->power_on = true;
+	} else {
+		pm_runtime_put(&client->dev);
+		ov4689->power_on = false;
+	}
+
+unlock_and_return:
+	mutex_unlock(&ov4689->mutex);
+
+	return ret;
+}
+
 /* Calculate the delay in us by clock rate and clock cycles */
 static inline u32 ov4689_cal_delay(u32 cycles)
 {
@@ -800,13 +842,16 @@ static int __ov4689_power_on(struct ov4689 *ov4689)
 		if (ret < 0)
 			dev_err(dev, "could not set pins\n");
 	}
-
+	ret = clk_set_rate(ov4689->xvclk, OV4689_XVCLK_FREQ);
+	if (ret < 0)
+		dev_warn(dev, "Failed to set xvclk rate (24MHz)\n");
+	if (clk_get_rate(ov4689->xvclk) != OV4689_XVCLK_FREQ)
+		dev_warn(dev, "xvclk mismatched, modes are based on 24MHz\n");
 	ret = clk_prepare_enable(ov4689->xvclk);
 	if (ret < 0) {
 		dev_err(dev, "Failed to enable xvclk\n");
 		return ret;
 	}
-
 	if (!IS_ERR(ov4689->reset_gpio))
 		gpiod_set_value_cansleep(ov4689->reset_gpio, 0);
 
@@ -896,6 +941,22 @@ static int ov4689_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 }
 #endif
 
+static int ov4689_enum_frame_interval(struct v4l2_subdev *sd,
+				       struct v4l2_subdev_pad_config *cfg,
+				       struct v4l2_subdev_frame_interval_enum *fie)
+{
+	if (fie->index >= ARRAY_SIZE(supported_modes))
+		return -EINVAL;
+
+	if (fie->code != MEDIA_BUS_FMT_SBGGR10_1X10)
+		return -EINVAL;
+
+	fie->width = supported_modes[fie->index].width;
+	fie->height = supported_modes[fie->index].height;
+	fie->interval = supported_modes[fie->index].max_fps;
+	return 0;
+}
+
 static const struct dev_pm_ops ov4689_pm_ops = {
 	SET_RUNTIME_PM_OPS(ov4689_runtime_suspend,
 			   ov4689_runtime_resume, NULL)
@@ -908,6 +969,7 @@ static const struct v4l2_subdev_internal_ops ov4689_internal_ops = {
 #endif
 
 static const struct v4l2_subdev_core_ops ov4689_core_ops = {
+	.s_power = ov4689_s_power,
 	.ioctl = ov4689_ioctl,
 #ifdef CONFIG_COMPAT
 	.compat_ioctl32 = ov4689_compat_ioctl32,
@@ -922,6 +984,7 @@ static const struct v4l2_subdev_video_ops ov4689_video_ops = {
 static const struct v4l2_subdev_pad_ops ov4689_pad_ops = {
 	.enum_mbus_code = ov4689_enum_mbus_code,
 	.enum_frame_size = ov4689_enum_frame_sizes,
+	.enum_frame_interval = ov4689_enum_frame_interval,
 	.get_fmt = ov4689_get_fmt,
 	.set_fmt = ov4689_set_fmt,
 };
@@ -1072,7 +1135,7 @@ static int ov4689_check_sensor_id(struct ov4689 *ov4689,
 			      OV4689_REG_VALUE_16BIT, &id);
 	if (id != CHIP_ID) {
 		dev_err(dev, "Unexpected sensor id(%06x), ret(%d)\n", id, ret);
-		return ret;
+		return -ENODEV;
 	}
 
 	dev_info(dev, "Detected OV%06x sensor\n", CHIP_ID);
@@ -1132,13 +1195,6 @@ static int ov4689_probe(struct i2c_client *client,
 		dev_err(dev, "Failed to get xvclk\n");
 		return -EINVAL;
 	}
-	ret = clk_set_rate(ov4689->xvclk, OV4689_XVCLK_FREQ);
-	if (ret < 0) {
-		dev_err(dev, "Failed to set xvclk rate (24MHz)\n");
-		return ret;
-	}
-	if (clk_get_rate(ov4689->xvclk) != OV4689_XVCLK_FREQ)
-		dev_warn(dev, "xvclk mismatched, modes are based on 24MHz\n");
 
 	ov4689->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_LOW);
 	if (IS_ERR(ov4689->reset_gpio))

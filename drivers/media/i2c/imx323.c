@@ -3,6 +3,9 @@
  * imx323 driver
  *
  * Copyright (C) 2017 Fuzhou Rockchip Electronics Co., Ltd.
+ *
+ * V0.0X01.0X01 add poweron function.
+ * V0.0X01.0X02 add enum_frame_interval function.
  */
 
 #include <linux/clk.h>
@@ -22,7 +25,7 @@
 #include <media/v4l2-ctrls.h>
 #include <media/v4l2-subdev.h>
 
-#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x0)
+#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x02)
 
 #ifndef V4L2_CID_DIGITAL_GAIN
 #define V4L2_CID_DIGITAL_GAIN		V4L2_CID_GAIN
@@ -88,7 +91,7 @@ struct regval {
 struct imx323_mode {
 	u32 width;
 	u32 height;
-	u32 max_fps;
+	struct v4l2_fract max_fps;
 	u32 hts_def;
 	u32 vts_def;
 	u32 exp_def;
@@ -113,6 +116,7 @@ struct imx323 {
 	struct v4l2_ctrl	*test_pattern;
 	struct mutex		mutex;
 	bool			streaming;
+	bool			power_on;
 	const struct imx323_mode *cur_mode;
 	u32			module_index;
 	const char		*module_facing;
@@ -163,7 +167,10 @@ static const struct imx323_mode supported_modes[] = {
 	{
 		.width = 2200,
 		.height = 1125,
-		.max_fps = 30,
+		.max_fps = {
+			.numerator = 10000,
+			.denominator = 300000,
+		},
 		.exp_def = 0x0100,
 		.hts_def = 0x044c * 2,
 		.vts_def = 0x0465,
@@ -519,11 +526,41 @@ static int imx323_g_frame_interval(struct v4l2_subdev *sd,
 	const struct imx323_mode *mode = imx323->cur_mode;
 
 	mutex_lock(&imx323->mutex);
-	fi->interval.numerator = 10000;
-	fi->interval.denominator = mode->max_fps * 10000;
+	fi->interval = mode->max_fps;
 	mutex_unlock(&imx323->mutex);
 
 	return 0;
+}
+
+static int imx323_s_power(struct v4l2_subdev *sd, int on)
+{
+	struct imx323 *imx323 = to_imx323(sd);
+	struct i2c_client *client = imx323->client;
+	int ret = 0;
+
+	mutex_lock(&imx323->mutex);
+
+	/* If the power state is not modified - no work to do. */
+	if (imx323->power_on == !!on)
+		goto unlock_and_return;
+
+	if (on) {
+		ret = pm_runtime_get_sync(&client->dev);
+		if (ret < 0) {
+			pm_runtime_put_noidle(&client->dev);
+			goto unlock_and_return;
+		}
+
+		imx323->power_on = true;
+	} else {
+		pm_runtime_put(&client->dev);
+		imx323->power_on = false;
+	}
+
+unlock_and_return:
+	mutex_unlock(&imx323->mutex);
+
+	return ret;
 }
 
 /* Calculate the delay in us by clock rate and clock cycles */
@@ -646,6 +683,22 @@ static int imx323_g_mbus_config(struct v4l2_subdev *sd,
 	return 0;
 }
 
+static int imx323_enum_frame_interval(struct v4l2_subdev *sd,
+				       struct v4l2_subdev_pad_config *cfg,
+				       struct v4l2_subdev_frame_interval_enum *fie)
+{
+	if (fie->index >= ARRAY_SIZE(supported_modes))
+		return -EINVAL;
+
+	if (fie->code != PIX_FORMAT)
+		return -EINVAL;
+
+	fie->width = supported_modes[fie->index].width;
+	fie->height = supported_modes[fie->index].height;
+	fie->interval = supported_modes[fie->index].max_fps;
+	return 0;
+}
+
 static const struct dev_pm_ops imx323_pm_ops = {
 	SET_RUNTIME_PM_OPS(imx323_runtime_suspend,
 			   imx323_runtime_resume, NULL)
@@ -658,6 +711,7 @@ static const struct v4l2_subdev_internal_ops imx323_internal_ops = {
 #endif
 
 static const struct v4l2_subdev_core_ops imx323_core_ops = {
+	.s_power = imx323_s_power,
 	.ioctl = imx323_ioctl,
 #ifdef CONFIG_COMPAT
 	.compat_ioctl32 = imx323_compat_ioctl32,
@@ -673,6 +727,7 @@ static const struct v4l2_subdev_video_ops imx323_video_ops = {
 static const struct v4l2_subdev_pad_ops imx323_pad_ops = {
 	.enum_mbus_code = imx323_enum_mbus_code,
 	.enum_frame_size = imx323_enum_frame_sizes,
+	.enum_frame_interval = imx323_enum_frame_interval,
 	.get_fmt = imx323_get_fmt,
 	.set_fmt = imx323_set_fmt,
 };
@@ -799,7 +854,7 @@ static int imx323_check_sensor_id(struct imx323 *imx323,
 			      IMX323_REG_VALUE_08BIT, &id);
 	if (id != CHIP_ID) {
 		dev_err(dev, "Unexpected sensor id(%x), ret(%d)\n", id, ret);
-		return ret;
+		return -ENODEV;
 	}
 
 	dev_info(dev, "Detected IMX323 sensor\n");

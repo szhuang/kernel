@@ -3,6 +3,10 @@
  * ov2718 driver
  *
  * Copyright (C) 2018 Fuzhou Rockchip Electronics Co., Ltd.
+ *
+ * V0.0X01.0X01 add poweron function.
+ * V0.0X01.0X02 fix mclk issue when probe multiple camera.
+ * V0.0X01.0X03 add enum_frame_interval function.
  */
 
 #include <linux/clk.h>
@@ -31,7 +35,7 @@
 #include <linux/mfd/syscon.h>
 #include <linux/rk-preisp.h>
 
-#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x0)
+#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x03)
 
 #ifndef V4L2_CID_DIGITAL_GAIN
 #define V4L2_CID_DIGITAL_GAIN		V4L2_CID_GAIN
@@ -122,7 +126,7 @@ struct ov2718_mode {
 	u32 bus_fmt;
 	u32 width;
 	u32 height;
-	u32 max_fps;
+	struct v4l2_fract max_fps;
 	u32 hts_def;
 	u32 vts_def;
 	u32 exp_def;
@@ -151,6 +155,7 @@ struct ov2718 {
 	struct v4l2_ctrl	*test_pattern;
 	struct mutex		mutex;
 	bool			streaming;
+	bool			power_on;
 	bool			has_devnode;
 	const struct ov2718_mode *cur_mode;
 	const struct ov2718_mode *support_modes;
@@ -3866,7 +3871,10 @@ static const struct ov2718_mode supported_hdr_modes[] = {
 		.bus_fmt = MEDIA_BUS_FMT_SBGGR10_1X10,
 		.width = 1920,
 		.height = 1080,
-		.max_fps = 30,
+		.max_fps = {
+			.numerator = 10000,
+			.denominator = 300000,
+		},
 		.exp_def = 0x0010,
 		.hts_def = 0x0dde,
 		.vts_def = 0x0466,
@@ -3879,7 +3887,10 @@ static const struct ov2718_mode supported_linear_modes[] = {
 		.bus_fmt = MEDIA_BUS_FMT_Y10_1X10,
 		.width = 1920,
 		.height = 1080,
-		.max_fps = 30,
+		.max_fps = {
+			.numerator = 10000,
+			.denominator = 300000,
+		},
 		.exp_def = 0x0010,
 		.hts_def = 0x0dde,
 		.vts_def = 0x0466,
@@ -4146,8 +4157,7 @@ static int ov2718_g_frame_interval(struct v4l2_subdev *sd,
 	const struct ov2718_mode *mode = ov2718->cur_mode;
 
 	mutex_lock(&ov2718->mutex);
-	fi->interval.numerator = 10000;
-	fi->interval.denominator = mode->max_fps * 10000;
+	fi->interval = mode->max_fps;
 	mutex_unlock(&ov2718->mutex);
 
 	return 0;
@@ -4447,6 +4457,37 @@ static long ov2718_compat_ioctl32(struct v4l2_subdev *sd,
 }
 #endif
 
+static int ov2718_s_power(struct v4l2_subdev *sd, int on)
+{
+	struct ov2718 *ov2718 = to_ov2718(sd);
+	struct i2c_client *client = ov2718->client;
+	int ret = 0;
+
+	mutex_lock(&ov2718->mutex);
+
+	/* If the power state is not modified - no work to do. */
+	if (ov2718->power_on == !!on)
+		goto unlock_and_return;
+
+	if (on) {
+		ret = pm_runtime_get_sync(&client->dev);
+		if (ret < 0) {
+			pm_runtime_put_noidle(&client->dev);
+			goto unlock_and_return;
+		}
+
+		ov2718->power_on = true;
+	} else {
+		pm_runtime_put(&client->dev);
+		ov2718->power_on = false;
+	}
+
+unlock_and_return:
+	mutex_unlock(&ov2718->mutex);
+
+	return ret;
+}
+
 /* Calculate the delay in us by clock rate and clock cycles */
 static inline u32 ov2718_cal_delay(u32 cycles)
 {
@@ -4467,13 +4508,16 @@ static int __ov2718_power_on(struct ov2718 *ov2718)
 		if (ret < 0)
 			dev_err(dev, "could not set pins\n");
 	}
-
+	ret = clk_set_rate(ov2718->xvclk, OV2718_XVCLK_FREQ);
+	if (ret < 0)
+		dev_warn(dev, "Failed to set xvclk rate (24MHz)\n");
+	if (clk_get_rate(ov2718->xvclk) != OV2718_XVCLK_FREQ)
+		dev_warn(dev, "xvclk mismatched, modes are based on 24MHz\n");
 	ret = clk_prepare_enable(ov2718->xvclk);
 	if (ret < 0) {
 		dev_err(dev, "Failed to enable xvclk\n");
 		return ret;
 	}
-
 	if (ov2718->regulators.regulator) {
 		for (i = 0; i < ov2718->regulators.cnt; i++) {
 			regulator = ov2718->regulators.regulator + i;
@@ -4597,6 +4641,24 @@ static int ov2718_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 }
 #endif
 
+static int ov2718_enum_frame_interval(struct v4l2_subdev *sd,
+				       struct v4l2_subdev_pad_config *cfg,
+				       struct v4l2_subdev_frame_interval_enum *fie)
+{
+	struct ov2718 *ov2718 = to_ov2718(sd);
+
+	if (fie->index >= ov2718->support_modes_num)
+		return -EINVAL;
+
+	if (fie->code != ov2718->support_modes[fie->index].bus_fmt)
+		return -EINVAL;
+
+	fie->width = ov2718->support_modes[fie->index].width;
+	fie->height = ov2718->support_modes[fie->index].height;
+	fie->interval = ov2718->support_modes[fie->index].max_fps;
+	return 0;
+}
+
 static const struct dev_pm_ops ov2718_pm_ops = {
 	SET_RUNTIME_PM_OPS(ov2718_runtime_suspend,
 			   ov2718_runtime_resume, NULL)
@@ -4616,11 +4678,13 @@ static const struct v4l2_subdev_video_ops ov2718_video_ops = {
 static const struct v4l2_subdev_pad_ops ov2718_pad_ops = {
 	.enum_mbus_code = ov2718_enum_mbus_code,
 	.enum_frame_size = ov2718_enum_frame_sizes,
+	.enum_frame_interval = ov2718_enum_frame_interval,
 	.get_fmt = ov2718_get_fmt,
 	.set_fmt = ov2718_set_fmt,
 };
 
 static const struct v4l2_subdev_core_ops ov2718_core_ops = {
+	.s_power = ov2718_s_power,
 	.ioctl = ov2718_ioctl,
 #ifdef CONFIG_COMPAT
 	.compat_ioctl32 = ov2718_compat_ioctl32,
@@ -4855,6 +4919,10 @@ static int ov2718_check_sensor_id(struct ov2718 *ov2718,
 		usleep_range(1000, 2000);
 		continue;
 	}
+
+	if (id != CHIP_ID)
+		return -ENODEV;
+
 	dev_info(dev, "Detected OV%06x sensor\n", CHIP_ID);
 
 	return 0;
@@ -4862,7 +4930,6 @@ static int ov2718_check_sensor_id(struct ov2718 *ov2718,
 
 static int ov2718_analyze_dts(struct ov2718 *ov2718)
 {
-	int ret;
 	int elem_size, elem_index;
 	const char *str = "";
 	struct property *prop;
@@ -4875,13 +4942,6 @@ static int ov2718_analyze_dts(struct ov2718 *ov2718)
 		dev_err(dev, "Failed to get xvclk\n");
 		return -EINVAL;
 	}
-	ret = clk_set_rate(ov2718->xvclk, OV2718_XVCLK_FREQ);
-	if (ret < 0) {
-		dev_err(dev, "Failed to set xvclk rate (24MHz)\n");
-		return ret;
-	}
-	if (clk_get_rate(ov2718->xvclk) != OV2718_XVCLK_FREQ)
-		dev_warn(dev, "xvclk mismatched, modes are based on 24MHz\n");
 
 	ov2718->pinctrl = devm_pinctrl_get(dev);
 	if (!IS_ERR(ov2718->pinctrl)) {
