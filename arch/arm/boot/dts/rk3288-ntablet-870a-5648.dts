@@ -48,7 +48,7 @@
 #include <dt-bindings/soc/rockchip-system-status.h>
 #include "rk3288.dtsi"
 #include "rk3288-linux.dtsi"
-#include "rk3288-rkisp1.dtsi"
+
 
 / {
 	model = "rk3288-ntablet";
@@ -487,12 +487,12 @@
 };
 
 &dfi {
-	status = "disabled";
+	status = "okay";
 };
 
 &dmc {
 	center-supply = <&vdd_logic>;
-	status = "disabled";
+	status = "okay";
 };
 
 &dsi0 {
@@ -893,10 +893,10 @@
 	status = "okay";
 };
 
-//&tsadc {
-	//rockchip,hw-tshut-polarity = <1>; /* tshut polarity 0:LOW 1:HIGH */
-	//status = "okay";
-//};
+&tsadc {
+	rockchip,hw-tshut-polarity = <0>; /* tshut polarity 0:LOW 1:HIGH */
+	status = "okay";
+};
 
 &rockchip_suspend {
 	status = "okay";
@@ -1071,7 +1071,7 @@
 	status = "okay";
 };
 
-&isp {
+&rkisp1 {
 	status = "okay";
 	port {
 		isp_mipi_in:endpoint {
