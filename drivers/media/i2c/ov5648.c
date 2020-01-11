@@ -36,7 +36,7 @@
 #include <linux/rk-camera-module.h>
 
 /* verify default register values */
-#define CHECK_REG_VALUE
+//#define CHECK_REG_VALUE
 //#define _DEBUG_   //debug switch
 #define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x03)
 
