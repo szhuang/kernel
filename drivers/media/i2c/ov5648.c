@@ -172,6 +172,12 @@ struct ov5648 {
 static const struct regval ov5648_global_regs[] = {
 	{OV5648_SW_RESET,0x01},		//software reset
 	{OV5648_REG_CTRL_MODE,0x00},	// Software Standy
+	{OV5648_REG_CTRL_MODE,0x00},	// Software Standy
+	{OV5648_REG_CTRL_MODE,0x00},	// Software Standy
+	{OV5648_REG_CTRL_MODE,0x00},	// Software Standy
+	{OV5648_REG_CTRL_MODE,0x00},	// Software Standy
+	{OV5648_REG_CTRL_MODE,0x00},	// Software Standy
+	{OV5648_REG_CTRL_MODE,0x00},	// Software Standy
 	{0x3001, 0x00},
 	{0x3002, 0x00},
 	{0x3011, 0x02},
@@ -1587,11 +1593,15 @@ static int ov5648_check_sensor_id(struct ov5648 *ov5648,
 				  struct i2c_client *client)
 {
 	struct device *dev = &ov5648->client->dev;
-	u32 id = 0;
+	u32 id = 0,delay_us;
 	int ret;
+	delay_us = ov5648_cal_delay(8192);
 #ifdef _DEBUG_
 	printk("ov5648_check_sensor_id \n");
+	printk("ov5648 sw_reset sent \n");
 #endif
+	ret = ov5648_write_reg(client, OV5648_SW_RESET,OV5648_REG_VALUE_08BIT, 0x01);
+	usleep_range(delay_us, delay_us * 2);
 	ret = ov5648_read_reg(client, OV5648_REG_CHIP_ID,OV5648_REG_VALUE_16BIT, &id);
 #ifdef _DEBUG_
 	printk("ov5648 check senor id %04x \n", id);

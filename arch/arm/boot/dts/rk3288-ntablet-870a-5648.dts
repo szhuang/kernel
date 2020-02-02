@@ -242,7 +242,7 @@
 	};
 
 	sound:sound {
-		status = "disabled";
+		status = "okay";
 		compatible = "simple-audio-card";
 		simple-audio-card,format = "i2s";
 		simple-audio-card,name = "rockchip,es8316-codec";
@@ -283,21 +283,8 @@
 	};
 
 	hdmi_analog_sound:hdmi-analog-sound {
-		status = "okay";
-		compatible = "rockchip,rk3288-hdmi-analog",
-		"rockchip,rk3368-hdmi-analog";
-		//rockchip,model = "rockchip,es8316-codec";
-		rockchip,cpu = <&i2s>;
+		status = "disabled";
 		rockchip,codec = <&es8316>, <&hdmi>;
-		rockchip,widgets =
-		"Microphone", "Microphone Jack",
-		"Headphone", "Headphone Jack";
-		rockchip,routing =
-		"MIC1", "Microphone Jack",
-		"MIC2", "Microphone Jack",
-		"Microphone Jack", "micbias1",
-		"Headphone Jack", "HPOL",
-		"Headphone Jack", "HPOR";
 	};
 
 	backlight:backlight {
