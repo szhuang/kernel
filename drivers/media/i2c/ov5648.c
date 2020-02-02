@@ -126,8 +126,8 @@ struct ov5648_mode {
 struct ov5648 {
 	struct i2c_client	*client;
 	struct clk		*xvclk;
-	//struct gpio_desc	*power_gpio;
-	//struct gpio_desc	*reset_gpio;
+	struct gpio_desc	*power_gpio;
+	struct gpio_desc	*reset_gpio;
 	struct gpio_desc	*pwdn_gpio;
 	struct regulator_bulk_data supplies[OV5648_NUM_SUPPLIES];
 
@@ -176,9 +176,6 @@ static const struct regval ov5648_global_regs[] = {
 	{OV5648_REG_CTRL_MODE,0x00},	// Software Standy
 	{OV5648_REG_CTRL_MODE,0x00},	// Software Standy
 	{OV5648_REG_CTRL_MODE,0x00},	// Software Standy
-	{OV5648_REG_CTRL_MODE,0x00},	// Software Standy
-	{OV5648_REG_CTRL_MODE,0x00},	// Software Standy
-	{0x3001, 0x00},
 	{0x3002, 0x00},
 	{0x3011, 0x02},
 	{0x3017, 0x05},
@@ -363,7 +360,7 @@ static const struct regval ov5648_2592x1944_regs[] = {
 	// 2592x1944 15fps 2 lane MIPI 420Mbps/lane
 	{OV5648_REG_CTRL_MODE,0x00},//software standby
 	{0x3501, 0x7b}, // exposure
-	{0x3502, 0x00}, // exposure
+	{0x2502, 0x00}, // exposure
 	{0x3708, 0x63},
 	{0x3709, 0x12},
 	{0x370c, 0xcc}, // changed by AM05d
@@ -1097,12 +1094,16 @@ static int __ov5648_start_stream(struct ov5648 *ov5648)
 
 static int __ov5648_stop_stream(struct ov5648 *ov5648)
 {
+	int ret=0;
 #ifdef _DEBUG_
 	printk("__ov5648_stop_stream \n");
 	printk("__ov5648_stop_stream OV5648_REG_CTRL_MODE set to 0 \n");
 #endif
-	return ov5648_write_reg(ov5648->client, OV5648_REG_CTRL_MODE,
-				OV5648_REG_VALUE_08BIT, OV5648_MODE_SW_STANDBY);
+	ret=ov5648_write_reg(ov5648->client, OV5648_REG_CTRL_MODE,OV5648_REG_VALUE_08BIT, OV5648_MODE_SW_STANDBY);
+	msleep(25);
+	//return ov5648_write_reg(ov5648->client, OV5648_REG_CTRL_MODE,
+	//			OV5648_REG_VALUE_08BIT, OV5648_MODE_SW_STANDBY);
+	return 0;
 }
 
 static int ov5648_s_stream(struct v4l2_subdev *sd, int on)
@@ -1158,9 +1159,8 @@ static int ov5648_s_power(struct v4l2_subdev *sd, int on)
 	mutex_lock(&ov5648->mutex);
 
 	/* If the power state is not modified - no work to do. */
-	if (ov5648->power_on == !!on){
+	if (ov5648->power_on == !!on)
 		goto unlock_and_return;
-	}
 
 	if (on) {
 		ret = pm_runtime_get_sync(&client->dev);
@@ -1225,6 +1225,7 @@ static int __ov5648_power_on(struct ov5648 *ov5648)
 		return ret;
 	}
 
+	usleep_range(1000, 2000);
 
 	//if (!IS_ERR(ov5648->reset_gpio))
 		//gpiod_set_value_cansleep(ov5648->reset_gpio, 1);
@@ -1232,9 +1233,10 @@ static int __ov5648_power_on(struct ov5648 *ov5648)
 	ret = regulator_bulk_enable(OV5648_NUM_SUPPLIES, ov5648->supplies);
 	if (ret < 0) {
 		dev_err(dev, "Failed to enable regulators\n");
-		goto disable_clk;
+		//goto disable_clk;
 	}
 
+	usleep_range(1000, 2000);
 
 	//if (!IS_ERR(ov5648->reset_gpio))
 	//	gpiod_set_value_cansleep(ov5648->reset_gpio, 0);
@@ -1257,8 +1259,8 @@ static int __ov5648_power_on(struct ov5648 *ov5648)
 
 	return 0;
 
-disable_clk:
-	clk_disable_unprepare(ov5648->xvclk);
+//disable_clk:
+	//clk_disable_unprepare(ov5648->xvclk);
 
 	return ret;
 }
@@ -1329,7 +1331,7 @@ static int ov5648_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 				v4l2_subdev_get_try_format(sd, fh->pad, 0);
 	const struct ov5648_mode *def_mode = &supported_modes[0];
 #ifdef _DEBUG_
-	printk("5648 ov5648_open \n");
+	printk("5648 ov5648_open");
 #endif
 	mutex_lock(&ov5648->mutex);
 	/* Initialize try_fmt */
@@ -1351,7 +1353,7 @@ static int ov5648_enum_frame_interval(struct v4l2_subdev *sd,
 {
 	struct ov5648 *ov5648 = to_ov5648(sd);
 #ifdef _DEBUG_
-	printk("ov5648_enum_frame_interval \n");
+	printk("ov5648_enum_frame_interval");
 #endif
 	if (fie->index >= ov5648->cfg_num)
 		return -EINVAL;
@@ -1598,10 +1600,7 @@ static int ov5648_check_sensor_id(struct ov5648 *ov5648,
 	delay_us = ov5648_cal_delay(8192);
 #ifdef _DEBUG_
 	printk("ov5648_check_sensor_id \n");
-	printk("ov5648 sw_reset sent \n");
 #endif
-	ret = ov5648_write_reg(client, OV5648_SW_RESET,OV5648_REG_VALUE_08BIT, 0x01);
-	usleep_range(delay_us, delay_us * 2);
 	ret = ov5648_read_reg(client, OV5648_REG_CHIP_ID,OV5648_REG_VALUE_16BIT, &id);
 #ifdef _DEBUG_
 	printk("ov5648 check senor id %04x \n", id);

@@ -48,7 +48,7 @@
 #include <dt-bindings/soc/rockchip-system-status.h>
 #include "rk3288.dtsi"
 #include "rk3288-linux.dtsi"
-
+#include "rk3288-rkisp1.dtsi"
 
 / {
 	model = "rk3288-ntablet";
@@ -242,7 +242,7 @@
 	};
 
 	sound:sound {
-		status = "okay";
+		status = "disabled";
 		compatible = "simple-audio-card";
 		simple-audio-card,format = "i2s";
 		simple-audio-card,name = "rockchip,es8316-codec";
@@ -283,8 +283,21 @@
 	};
 
 	hdmi_analog_sound:hdmi-analog-sound {
-		status = "disabled";
+		status = "okay";
+		compatible = "rockchip,rk3288-hdmi-analog",
+		"rockchip,rk3368-hdmi-analog";
+		//rockchip,model = "rockchip,es8316-codec";
+		rockchip,cpu = <&i2s>;
 		rockchip,codec = <&es8316>, <&hdmi>;
+		rockchip,widgets =
+		"Microphone", "Microphone Jack",
+		"Headphone", "Headphone Jack";
+		rockchip,routing =
+		"MIC1", "Microphone Jack",
+		"MIC2", "Microphone Jack",
+		"Microphone Jack", "micbias1",
+		"Headphone Jack", "HPOL",
+		"Headphone Jack", "HPOR";
 	};
 
 	backlight:backlight {
@@ -1058,7 +1071,7 @@
 	status = "okay";
 };
 
-&rkisp1 {
+&isp {
 	status = "okay";
 	port {
 		isp_mipi_in:endpoint {
