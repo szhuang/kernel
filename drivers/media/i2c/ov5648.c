@@ -1100,8 +1100,6 @@ static int __ov5648_stop_stream(struct ov5648 *ov5648)
 	printk("__ov5648_stop_stream OV5648_REG_CTRL_MODE set to 0 \n");
 #endif
 	return ov5648_write_reg(ov5648->client, OV5648_REG_CTRL_MODE,OV5648_REG_VALUE_08BIT, OV5648_MODE_SW_STANDBY);
-	msleep(25);
-	//return 0;
 }
 
 static int ov5648_s_stream(struct v4l2_subdev *sd, int on)
