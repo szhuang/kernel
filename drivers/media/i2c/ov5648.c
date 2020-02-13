@@ -57,6 +57,9 @@
 #define OV5648_REG_CTRL_MODE		0x0100 //software standby(0)/streaming(1)
 #define OV5648_MODE_SW_STANDBY		0x00	//standby(0)
 #define OV5648_MODE_STREAMING		0x01		//streaming(1)
+#define OV5648_REG_FACING		0x3821		//facing
+#define OV5648_REG_FACING_BACK	0x07		//back mirror on, v bin on
+#define	OV5648_REG_FACING_FRONT	0x01		//front mirror off, v bin on
 
 #define OV5648_REG_EXPOSURE		0x3500
 #define	OV5648_EXPOSURE_MIN		4
@@ -261,7 +264,6 @@ static const struct regval ov5648_global_regs[] = {
 	{0x3815, 0x31},
 	{0x3817, 0x00},
 	{0x3820, 0x08},
-	{0x3821, 0x07},
 	{0x3826, 0x03},
 	{0x3829, 0x00},
 	{0x382b, 0x0b},
@@ -390,7 +392,6 @@ static const struct regval ov5648_2592x1944_regs[] = {
 	{0x3815, 0x11}, // y inc
 	{0x3817, 0x00}, // hsync start
 	{0x3820, 0x40}, // flip off, v bin off
-	{0x3821, 0x06}, // mirror on, v bin off
 	{0x4004, 0x04}, // black line number
 	{0x4005, 0x1a}, // blc always update
 	{0x350b, 0x40}, // gain = 4x
@@ -441,7 +442,6 @@ static const struct regval ov5648_1296x972_regs[] = {
 	{0x3815, 0x31}, // y inc
 	{0x3817, 0x00}, // hsync start
 	{0x3820, 0x08}, // flip off, v bin off
-	{0x3821, 0x07}, // mirror on, h bin on
 	{0x4004, 0x02}, // black line number
 	{0x4005, 0x18}, // blc level trigger
 	{0x350b, 0x80}, // gain = 8x
@@ -488,7 +488,6 @@ static const struct regval ov5648_1920x1080_regs[] = {
 		{0x3815, 0x11},// y inc
 		{0x3817,0x00},// hsync start
 		{0x3820,0x08},// flip off, v bin off
-		{0x3821,0x07},// mirror on, h bin on
 		{0x4004,0x02},// black line number
 		{0x4005,0x18},// blc level trigger
 		{0x350b,0x20},// gain = 2x
@@ -536,7 +535,6 @@ static const struct regval ov5648_1280x720_regs[] = {
 		{0x3815,0x31},// y inc
 		{0x3817,0x00},// hsync start
 		{0x3820,0x08},// flip off, v bin off
-		{0x3821,0x07},// mirror on, h bin on
 		{0x4004,0x02},// black line number
 		{0x4005,0x1a},// blc level trigger
 		{0x350b,0x20},// gain = 2x
@@ -584,7 +582,6 @@ static const struct regval ov5648_640x480_regs[] = {
 		{0x3815, 0x53}, //y inc
 		{0x3817, 0x00}, //hsync start
 		{0x3820, 0x08}, //flip off, v bin off
-		{0x3821, 0x07}, //mirror on, h bin on
 		{0x4004,0x02},	// black line number
 		{0x4005,0x18},	// blc level trigger
 		{0x350b,0x20},	// gain = 2x
@@ -1088,6 +1085,20 @@ static int __ov5648_start_stream(struct ov5648 *ov5648)
 #ifdef _DEBUG_
 	printk("ov5648_start_stream OV5648_REG_CTRL_MODE set to 1 \n");
 #endif
+
+	if (strcmp(ov5648->module_facing, "back") == 0){
+#ifdef _DEBUG_
+		printk("ov5648_start_stream facing is back \n");
+#endif
+		ret = ov5648_write_reg(ov5648->client, OV5648_REG_FACING,
+				OV5648_REG_VALUE_08BIT, OV5648_REG_FACING_BACK);
+	}else{
+#ifdef _DEBUG_
+		printk("ov5648_start_stream facing is font \n");
+#endif
+		ret = ov5648_write_reg(ov5648->client, OV5648_REG_FACING,
+				OV5648_REG_VALUE_08BIT, OV5648_REG_FACING_FRONT);
+	}
 	ret = ov5648_write_reg(ov5648->client, OV5648_REG_CTRL_MODE,
 				OV5648_REG_VALUE_08BIT, OV5648_MODE_STREAMING);
 	return ret;

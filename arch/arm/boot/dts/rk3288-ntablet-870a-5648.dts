@@ -1027,7 +1027,7 @@
 		dvdd-supply = <&dvdd_1v5>;
 		dvp-supply = <&vcc18_dvp>;
 		rockchip,camera-module-index = <0>;
-		rockchip,camera-module-facing = "back";
+		rockchip,camera-module-facing = "front";
 		rockchip,camera-module-name = "CameraKing";
 		rockchip,camera-module-lens-name = "CHT-842B-MD";
 		power-gpios = <&gpio0 17 GPIO_ACTIVE_HIGH>;
